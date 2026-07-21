@@ -7,6 +7,7 @@ export default function AddDropRequests() {
   const [filter, setFilter] = useState('pending');
   const [actionLoading, setActionLoading] = useState(null);
   const [remarks, setRemarks] = useState({});
+  const [editingId, setEditingId] = useState(null);
 
   const fetchRequests = () => {
     setLoading(true);
@@ -26,12 +27,32 @@ export default function AddDropRequests() {
         status,
         admin_remarks: remarks[id] || '',
       });
+      setEditingId(null);
       fetchRequests();
     } catch (err) {
       alert(err.message);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleUndo = async (id) => {
+    if (!confirm('Undo this decision and return the request to pending?')) return;
+    setActionLoading(id);
+    try {
+      await api.post(`/admin/add-drop-requests/${id}/undo/`, {});
+      setEditingId(null);
+      fetchRequests();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const startEditing = (req) => {
+    setRemarks({ ...remarks, [req.id]: req.admin_remarks || '' });
+    setEditingId(req.id);
   };
 
   return (
@@ -94,7 +115,7 @@ export default function AddDropRequests() {
                       {req.status === 'rejected' && <span className="badge badge-red">Rejected</span>}
                     </td>
                     <td>
-                      {req.status === 'pending' ? (
+                      {req.status === 'pending' || editingId === req.id ? (
                         <div>
                           <input
                             className="form-control mb-16"
@@ -108,10 +129,24 @@ export default function AddDropRequests() {
                               onClick={() => handleResolve(req.id, 'approved')}>Approve</button>
                             <button className="btn btn-danger btn-sm" disabled={actionLoading === req.id}
                               onClick={() => handleResolve(req.id, 'rejected')}>Reject</button>
+                            {editingId === req.id && (
+                              <button className="btn btn-outline btn-sm" disabled={actionLoading === req.id}
+                                onClick={() => setEditingId(null)}>Cancel</button>
+                            )}
                           </div>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{req.admin_remarks || '—'}</span>
+                        <div>
+                          <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '6px' }}>
+                            {req.admin_remarks || '—'}
+                          </div>
+                          <div className="btn-group">
+                            <button className="btn btn-secondary btn-sm" disabled={actionLoading === req.id}
+                              onClick={() => startEditing(req)}>Edit</button>
+                            <button className="btn btn-outline btn-sm" disabled={actionLoading === req.id}
+                              onClick={() => handleUndo(req.id)}>Undo</button>
+                          </div>
+                        </div>
                       )}
                     </td>
                   </tr>

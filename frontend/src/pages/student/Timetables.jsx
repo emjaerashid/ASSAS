@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../utils/api';
+import api, { resolveMediaUrl } from '../../utils/api';
 
 export default function StudentTimetables() {
   const [timetables, setTimetables] = useState([]);
@@ -40,13 +40,13 @@ export default function StudentTimetables() {
                   Uploaded on {new Date(tt.uploaded_at).toLocaleDateString()}
                 </p>
                 {tt.file && (tt.file.endsWith('.pdf') ? (
-                  <a href={tt.file} target="_blank" rel="noreferrer" className="btn btn-secondary">
+                  <a href={resolveMediaUrl(tt.file)} target="_blank" rel="noreferrer" className="btn btn-secondary">
                     View PDF Timetable
                   </a>
                 ) : (
                   <div>
                     <img
-                      src={tt.file}
+                      src={resolveMediaUrl(tt.file)}
                       alt={tt.title}
                       style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--gray-200)' }}
                     />

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from core.models import (
-    User, Programme, Student, Subject, Prerequisite,
+    User, Faculty, Programme, Student, Subject, Prerequisite,
     Enrolment, ExceptionLog, Rule, AddDropRequest, Timetable,
 )
 
@@ -22,9 +22,14 @@ class UserAdmin(BaseUserAdmin):
     )
 
 
+@admin.register(Faculty)
+class FacultyAdmin(admin.ModelAdmin):
+    list_display = ('faculty_code', 'faculty_name')
+
+
 @admin.register(Programme)
 class ProgrammeAdmin(admin.ModelAdmin):
-    list_display = ('programme_code', 'programme_name', 'total_credits', 'max_credits_per_sem')
+    list_display = ('programme_code', 'programme_name', 'faculty', 'total_credits', 'max_credits_per_sem')
 
 
 @admin.register(Student)

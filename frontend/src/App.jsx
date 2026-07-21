@@ -15,7 +15,6 @@ import Subjects from './pages/admin/Subjects';
 import MySubjects from './pages/student/MySubjects';
 import Progress from './pages/student/Progress';
 import AddDrop from './pages/student/AddDrop';
-import StudentExceptions from './pages/student/Exceptions';
 import StudentTimetables from './pages/student/Timetables';
 
 function HomeRedirect() {
@@ -51,7 +50,6 @@ function App() {
             <Route index element={<MySubjects />} />
             <Route path="progress" element={<Progress />} />
             <Route path="add-drop" element={<AddDrop />} />
-            <Route path="exceptions" element={<StudentExceptions />} />
             <Route path="timetables" element={<StudentTimetables />} />
           </Route>
         </Routes>

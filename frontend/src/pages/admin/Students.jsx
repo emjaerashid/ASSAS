@@ -3,11 +3,12 @@ import api from '../../utils/api';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
+  const [programmes, setProgrammes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     student_id: '', full_name: '', ic_passport: '',
-    programme_code: 'BCSSE', current_year: 1, current_semester: 1,
+    programme_code: '', current_year: 1, current_semester: 1,
     status: 'active', is_repeat: false, is_transfer: false,
   });
   const [error, setError] = useState('');
@@ -23,6 +24,17 @@ export default function Students() {
 
   useEffect(fetchStudents, []);
 
+  useEffect(() => {
+    api.get('/programmes/')
+      .then((data) => {
+        setProgrammes(data);
+        if (data.length > 0) {
+          setForm((f) => ({ ...f, programme_code: data[0].programme_code }));
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setError('');
@@ -32,7 +44,7 @@ export default function Students() {
       setShowModal(false);
       setForm({
         student_id: '', full_name: '', ic_passport: '',
-        programme_code: 'BCSSE', current_year: 1, current_semester: 1,
+        programme_code: programmes[0]?.programme_code || '', current_year: 1, current_semester: 1,
         status: 'active', is_repeat: false, is_transfer: false,
       });
       fetchStudents();
@@ -133,6 +145,17 @@ export default function Students() {
                   <input className="form-control" value={form.ic_passport}
                     onChange={(e) => setForm({...form, ic_passport: e.target.value})} required />
                 </div>
+                <div className="form-group">
+                  <label>Programme</label>
+                  <select className="form-control" value={form.programme_code}
+                    onChange={(e) => setForm({...form, programme_code: e.target.value})} required>
+                    {programmes.map((p) => (
+                      <option key={p.programme_code} value={p.programme_code}>
+                        {p.programme_code} - {p.programme_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid-2">
                   <div className="form-group">
                     <label>Year</label>
@@ -145,7 +168,7 @@ export default function Students() {
                     <label>Semester</label>
                     <select className="form-control" value={form.current_semester}
                       onChange={(e) => setForm({...form, current_semester: parseInt(e.target.value)})}>
-                      {[1,2].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      {[1,2,3].map(s => <option key={s} value={s}>Semester {s}</option>)}
                     </select>
                   </div>
                 </div>

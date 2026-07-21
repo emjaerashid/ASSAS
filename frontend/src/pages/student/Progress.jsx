@@ -31,15 +31,11 @@ export default function Progress() {
         </div>
         <div className="stat-card sky">
           <div className="stat-label">Current Position</div>
-          <div className="stat-value">Y{student.current_year} S{student.current_semester}</div>
+          <div className="stat-value" style={{ fontSize: '18px' }}>Year: {student.current_year}<br />Semester: {student.current_semester}</div>
         </div>
         <div className="stat-card sky">
           <div className="stat-label">Status</div>
-          <div className="stat-value" style={{ fontSize: '18px', textTransform: 'capitalize' }}>{student.status}</div>
-        </div>
-        <div className="stat-card sky">
-          <div className="stat-label">CGPA</div>
-          <div className="stat-value">{student.cgpa}</div>
+          <div className="stat-value" style={{ fontSize: '18px', textTransform: 'capitalize', color: student.status === 'active' ? '#10B981' : undefined }}>{student.status}</div>
         </div>
       </div>
 

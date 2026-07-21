@@ -16,7 +16,7 @@ class RuleEngine:
       6. Conflict Detection
     """
 
-    def __init__(self, student: Student, semester: str):
+    def __init__(self, student: Student, semester: str, max_subjects: int = None):
         self.student = student
         self.semester = semester
         self.programme = student.programme
@@ -24,6 +24,7 @@ class RuleEngine:
         self.assigned_credits = 0
         self.exceptions = []
         self.credit_cap = student.effective_credit_cap
+        self.max_subjects = max_subjects
 
     def run(self):
         completed_codes = self._get_completed_subject_codes()
@@ -87,6 +88,15 @@ class RuleEngine:
                 'reason': reason,
                 'details': f'Adding {subject.subject_code} ({subject.credit_hours} cr) would exceed '
                            f'limit of {self.credit_cap} credits. Currently assigned: {self.assigned_credits} cr.',
+            }
+
+        # Duration-based Subject Count Limit
+        if self.max_subjects is not None and len(self.assigned_subjects) >= self.max_subjects:
+            return {
+                'action': 'flag',
+                'reason': 'subject_limit_exceeded',
+                'details': f'Adding {subject.subject_code} would exceed the maximum of '
+                           f'{self.max_subjects} subjects for this semester duration.',
             }
 
         # Rule 4: Repeat Subject Handling (already prioritised in ordering)
@@ -156,7 +166,7 @@ class RuleEngine:
         )
 
 
-def run_assignment_for_student(student: Student, semester: str):
+def run_assignment_for_student(student: Student, semester: str, max_subjects: int = None):
     Enrolment.objects.filter(
         student=student,
         semester=semester,
@@ -171,14 +181,18 @@ def run_assignment_for_student(student: Student, semester: str):
         created_at__gte=student.user.date_joined,
     ).delete()
 
-    engine = RuleEngine(student, semester)
+    engine = RuleEngine(student, semester, max_subjects=max_subjects)
     return engine.run()
 
 
-def run_assignment_for_all(semester: str):
+def run_assignment_for_all(semester: str, max_subjects: int = None, programme_code: str = None, faculty_code: str = None):
     students = Student.objects.filter(status__in=['active', 'probation'])
+    if programme_code:
+        students = students.filter(programme__programme_code=programme_code)
+    if faculty_code:
+        students = students.filter(programme__faculty__faculty_code=faculty_code)
     results = []
     for student in students:
-        result = run_assignment_for_student(student, semester)
+        result = run_assignment_for_student(student, semester, max_subjects=max_subjects)
         results.append(result)
     return results

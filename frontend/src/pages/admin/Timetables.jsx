@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../../utils/api';
+import api, { resolveMediaUrl } from '../../utils/api';
 
 export default function Timetables() {
   const [timetables, setTimetables] = useState([]);
@@ -95,7 +95,7 @@ export default function Timetables() {
                     <td>{new Date(tt.uploaded_at).toLocaleDateString()}</td>
                     <td>
                       <div className="btn-group">
-                        <a href={tt.file} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                        <a href={resolveMediaUrl(tt.file)} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
                           View
                         </a>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(tt.id)}>

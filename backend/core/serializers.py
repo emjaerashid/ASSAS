@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from core.models import (
-    User, Programme, Student, Subject, Prerequisite,
+    User, Faculty, Programme, Student, Subject, Prerequisite,
     Enrolment, ExceptionLog, Rule, AddDropRequest, Timetable,
 )
 
@@ -11,7 +11,15 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'student_id', 'full_name', 'role', 'is_active', 'date_joined']
 
 
+class FacultySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Faculty
+        fields = '__all__'
+
+
 class ProgrammeSerializer(serializers.ModelSerializer):
+    faculty_name = serializers.CharField(source='faculty.faculty_name', read_only=True, default=None)
+
     class Meta:
         model = Programme
         fields = '__all__'
@@ -19,10 +27,16 @@ class ProgrammeSerializer(serializers.ModelSerializer):
 
 class SubjectSerializer(serializers.ModelSerializer):
     prerequisites = serializers.SerializerMethodField()
+    prerequisite_codes = serializers.ListField(
+        child=serializers.CharField(), write_only=True, required=False
+    )
 
     class Meta:
         model = Subject
-        fields = ['subject_code', 'subject_name', 'credit_hours', 'programme', 'year', 'semester', 'prerequisites']
+        fields = [
+            'subject_code', 'subject_name', 'credit_hours', 'programme', 'year', 'semester',
+            'prerequisites', 'prerequisite_codes',
+        ]
 
     def get_prerequisites(self, obj):
         return [
@@ -32,6 +46,32 @@ class SubjectSerializer(serializers.ModelSerializer):
             }
             for p in obj.prerequisites.select_related('prerequisite_subject').all()
         ]
+
+    def create(self, validated_data):
+        prerequisite_codes = validated_data.pop('prerequisite_codes', [])
+        subject = Subject.objects.create(**validated_data)
+        self._set_prerequisites(subject, prerequisite_codes)
+        return subject
+
+    def update(self, instance, validated_data):
+        prerequisite_codes = validated_data.pop('prerequisite_codes', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if prerequisite_codes is not None:
+            self._set_prerequisites(instance, prerequisite_codes)
+        return instance
+
+    def _set_prerequisites(self, subject, codes):
+        subject.prerequisites.all().delete()
+        for code in codes:
+            if code == subject.subject_code:
+                continue
+            try:
+                prerequisite_subject = Subject.objects.get(subject_code=code)
+            except Subject.DoesNotExist:
+                continue
+            Prerequisite.objects.create(subject=subject, prerequisite_subject=prerequisite_subject)
 
 
 class StudentSerializer(serializers.ModelSerializer):

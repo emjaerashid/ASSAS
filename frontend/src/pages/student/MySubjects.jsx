@@ -4,19 +4,27 @@ import api from '../../utils/api';
 
 export default function MySubjects() {
   const { user } = useAuth();
-  const [enrolments, setEnrolments] = useState([]);
+  const [allEnrolments, setAllEnrolments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [semesterFilter, setSemesterFilter] = useState('');
 
   useEffect(() => {
-    const query = semesterFilter ? `?semester=${semesterFilter}` : '';
-    api.get(`/student/subjects/${query}`)
-      .then(setEnrolments)
+    api.get('/student/subjects/')
+      .then((data) => {
+        setAllEnrolments(data);
+        // Default to the most recent semester with active (assigned/in_progress)
+        // subjects, so the page opens on "this semester" rather than full history.
+        const active = data.filter((e) => e.status === 'assigned' || e.status === 'in_progress');
+        const pool = active.length ? active : data;
+        const current = pool.reduce((latest, e) => (e.semester > latest ? e.semester : latest), '');
+        setSemesterFilter(current);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [semesterFilter]);
+  }, []);
 
-  const semesters = [...new Set(enrolments.map((e) => e.semester))].sort();
+  const semesters = [...new Set(allEnrolments.map((e) => e.semester))].sort();
+  const enrolments = semesterFilter ? allEnrolments.filter((e) => e.semester === semesterFilter) : allEnrolments;
 
   const statusBadge = (status) => {
     const map = {

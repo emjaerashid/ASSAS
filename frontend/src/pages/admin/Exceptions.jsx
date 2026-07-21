@@ -6,6 +6,7 @@ export default function Exceptions() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
   const [actionLoading, setActionLoading] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
   const fetchExceptions = () => {
     setLoading(true);
@@ -22,6 +23,21 @@ export default function Exceptions() {
     setActionLoading(id);
     try {
       await api.put(`/admin/exceptions/${id}/resolve/`, { status, semester });
+      setEditingId(null);
+      fetchExceptions();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUndo = async (id) => {
+    if (!confirm('Undo this decision and return the exception to pending?')) return;
+    setActionLoading(id);
+    try {
+      await api.post(`/admin/exceptions/${id}/undo/`, {});
+      setEditingId(null);
       fetchExceptions();
     } catch (err) {
       alert(err.message);
@@ -86,7 +102,7 @@ export default function Exceptions() {
                       {ex.status === 'rejected' && <span className="badge badge-red">Rejected</span>}
                     </td>
                     <td>
-                      {ex.status === 'pending' && (
+                      {(ex.status === 'pending' || editingId === ex.id) ? (
                         <div className="btn-group">
                           <button
                             className="btn btn-success btn-sm"
@@ -102,6 +118,17 @@ export default function Exceptions() {
                           >
                             Reject
                           </button>
+                          {editingId === ex.id && (
+                            <button className="btn btn-outline btn-sm" disabled={actionLoading === ex.id}
+                              onClick={() => setEditingId(null)}>Cancel</button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="btn-group">
+                          <button className="btn btn-secondary btn-sm" disabled={actionLoading === ex.id}
+                            onClick={() => setEditingId(ex.id)}>Edit</button>
+                          <button className="btn btn-outline btn-sm" disabled={actionLoading === ex.id}
+                            onClick={() => handleUndo(ex.id)}>Undo</button>
                         </div>
                       )}
                     </td>

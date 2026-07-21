@@ -1,14 +1,16 @@
 from django.core.management.base import BaseCommand
-from core.models import User, Programme, Student, Subject, Prerequisite, Rule
+from core.models import User, Faculty, Programme, Student, Subject, Prerequisite, Rule
 
 
 class Command(BaseCommand):
-    help = 'Seed the database with BCSSE programme structure and sample students'
+    help = 'Seed the database with the Faculty of IT programme structure and sample students'
 
     def handle(self, *args, **options):
-        self.stdout.write('Seeding BCSSE programme data...')
+        self.stdout.write('Seeding Faculty of Information Technology data...')
 
-        programme = self._create_programme()
+        faculty = self._create_faculty()
+        programme = self._create_programme(faculty)
+        self._create_other_programmes(faculty)
         subjects = self._create_subjects(programme)
         self._create_prerequisites(subjects)
         self._create_rules(programme)
@@ -17,19 +19,65 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('Seed data created successfully!'))
 
-    def _create_programme(self):
+    def _create_faculty(self):
+        faculty, _ = Faculty.objects.update_or_create(
+            faculty_code='FIT',
+            defaults={'faculty_name': 'Faculty of Information Technology'},
+        )
+        self.stdout.write(f'  Faculty: {faculty}')
+        return faculty
+
+    def _create_programme(self, faculty):
         programme, _ = Programme.objects.update_or_create(
             programme_code='BCSSE',
             defaults={
-                'programme_name': 'Bachelor of Computer Science (Software Engineering)',
+                'programme_name': 'Bachelor of Computer Science (Software Engineering) (Hons)',
+                'faculty': faculty,
                 'total_credits': 133,
                 'max_credits_per_sem': 21,
                 'probation_credit_cap': 12,
-                'total_semesters': 8,
+                'total_semesters': 12,
             },
         )
         self.stdout.write(f'  Programme: {programme}')
         return programme
+
+    def _create_other_programmes(self, faculty):
+        other_programmes = [
+            {
+                'programme_code': 'BCSAI',
+                'programme_name': 'Bachelor of Computer Science (Artificial Intelligence) (Hons)',
+                'total_credits': 133, 'max_credits_per_sem': 21,
+                'probation_credit_cap': 12, 'total_semesters': 12,
+            },
+            {
+                'programme_code': 'BCSCS',
+                'programme_name': 'Bachelor of Computer Science (Cybersecurity) (Hons)',
+                'total_credits': 133, 'max_credits_per_sem': 21,
+                'probation_credit_cap': 12, 'total_semesters': 12,
+            },
+            {
+                'programme_code': 'BIT',
+                'programme_name': 'Bachelor of Information Technology (Hons)',
+                'total_credits': 133, 'max_credits_per_sem': 21,
+                'probation_credit_cap': 12, 'total_semesters': 12,
+            },
+            {
+                'programme_code': 'DCS',
+                'programme_name': 'Diploma of Computer Science',
+                'total_credits': 90, 'max_credits_per_sem': 18,
+                'probation_credit_cap': 10, 'total_semesters': 9,
+            },
+        ]
+
+        for data in other_programmes:
+            code = data.pop('programme_code')
+            programme, _ = Programme.objects.update_or_create(
+                programme_code=code,
+                defaults={'faculty': faculty, **data},
+            )
+            self.stdout.write(f'  Programme: {programme}')
+            self._create_rules(programme)
 
     def _create_subjects(self, programme):
         subject_data = [
@@ -37,41 +85,43 @@ class Command(BaseCommand):
             ('BCS1013', 'Introduction to Computer Science', 3, 1, 1),
             ('BCS1023', 'Programming Fundamentals', 3, 1, 1),
             ('BIT1013', 'Discrete Mathematics', 3, 1, 1),
-            ('BIT1023', 'Computer Organization & Architecture', 3, 1, 1),
-            ('MPU3113', 'Hubungan Etnik', 3, 1, 1),
-            ('MPU3123', 'Tamadun Islam dan Tamadun Asia', 3, 1, 1),
             ('BEN1013', 'English Communication I', 3, 1, 1),
 
             # Year 1, Semester 2
-            ('BCS1033', 'Data Structures & Algorithms', 3, 1, 2),
-            ('BCS1043', 'Object-Oriented Programming', 3, 1, 2),
+            ('BIT1023', 'Computer Organization & Architecture', 3, 1, 2),
+            ('MPU3113', 'Hubungan Etnik', 3, 1, 2),
+            ('MPU3123', 'Tamadun Islam dan Tamadun Asia', 3, 1, 2),
             ('BIT1033', 'Mathematics for Computing', 3, 1, 2),
-            ('BIT1043', 'Database Systems', 3, 1, 2),
-            ('BEN1023', 'English Communication II', 3, 1, 2),
-            ('MPU3133', 'Bahasa Kebangsaan A', 3, 1, 2),
             ('MPU3212', 'Community Service', 2, 1, 2),
+
+            # Year 1, Semester 3
+            ('BCS1033', 'Data Structures & Algorithms', 3, 1, 3),
+            ('BCS1043', 'Object-Oriented Programming', 3, 1, 3),
+            ('BIT1043', 'Database Systems', 3, 1, 3),
+            ('BEN1023', 'English Communication II', 3, 1, 3),
+            ('MPU3133', 'Bahasa Kebangsaan A', 3, 1, 3),
 
             # Year 2, Semester 1
             ('BCS2013', 'Software Engineering', 3, 2, 1),
-            ('BCS2023', 'Web Programming', 3, 2, 1),
             ('BIT2013', 'Operating Systems', 3, 2, 1),
             ('BIT2023', 'Computer Networks', 3, 2, 1),
-            ('BIT2033', 'Statistics & Probability', 3, 2, 1),
-            ('BCS2033', 'Human-Computer Interaction', 3, 2, 1),
             ('MPU3143', 'Falsafah dan Isu Semasa', 3, 2, 1),
 
             # Year 2, Semester 2
-            ('BCS2043', 'Requirements Engineering', 3, 2, 2),
-            ('BCS2053', 'Mobile Application Development', 3, 2, 2),
-            ('BCS2063', 'Software Design & Architecture', 3, 2, 2),
-            ('BIT2043', 'Information Security', 3, 2, 2),
+            ('BCS2023', 'Web Programming', 3, 2, 2),
+            ('BIT2033', 'Statistics & Probability', 3, 2, 2),
+            ('BCS2033', 'Human-Computer Interaction', 3, 2, 2),
             ('BIT2053', 'System Analysis & Design', 3, 2, 2),
-            ('BEN2013', 'Technical Writing', 3, 2, 2),
-            ('BCS2072', 'Co-curriculum', 2, 2, 2),
+
+            # Year 2, Semester 3
+            ('BCS2043', 'Requirements Engineering', 3, 2, 3),
+            ('BCS2063', 'Software Design & Architecture', 3, 2, 3),
+            ('BIT2043', 'Information Security', 3, 2, 3),
+            ('BCS2053', 'Mobile Application Development', 3, 2, 3),
+            ('BEN2013', 'Technical Writing', 3, 2, 3),
+            ('BCS2072', 'Co-curriculum', 2, 2, 3),
 
             # Year 3, Semester 1
-            ('BCS3013', 'Software Testing & Quality Assurance', 3, 3, 1),
-            ('BCS3023', 'Software Project Management', 3, 3, 1),
             ('BCS3033', 'Artificial Intelligence', 3, 3, 1),
             ('BCS3043', 'Cloud Computing', 3, 3, 1),
             ('BIT3013', 'Elective I', 3, 3, 1),
@@ -79,20 +129,26 @@ class Command(BaseCommand):
             ('BIT3033', 'Technopreneurship', 3, 3, 1),
 
             # Year 3, Semester 2
-            ('BIT3043', 'Project 1', 3, 3, 2),
-            ('BCS3053', 'DevOps & Continuous Integration', 3, 3, 2),
+            ('BCS3013', 'Software Testing & Quality Assurance', 3, 3, 2),
+            ('BCS3023', 'Software Project Management', 3, 3, 2),
             ('BCS3063', 'Data Science Fundamentals', 3, 3, 2),
-            ('BIT3053', 'Elective II', 3, 3, 2),
-            ('BIT3063', 'Elective III', 3, 3, 2),
             ('BCS3073', 'Advanced Database Systems', 3, 3, 2),
+
+            # Year 3, Semester 3
+            ('BIT3043', 'Project 1', 3, 3, 3),
+            ('BCS3053', 'DevOps & Continuous Integration', 3, 3, 3),
+            ('BIT3053', 'Elective II', 3, 3, 3),
+            ('BIT3063', 'Elective III', 3, 3, 3),
 
             # Year 4, Semester 1
             ('BIT4016', 'Industrial Training', 6, 4, 1),
 
             # Year 4, Semester 2
             ('BIT4026', 'Project 2', 6, 4, 2),
-            ('BCS4013', 'Emerging Technologies', 3, 4, 2),
-            ('BIT4033', 'Elective IV', 3, 4, 2),
+
+            # Year 4, Semester 3
+            ('BCS4013', 'Emerging Technologies', 3, 4, 3),
+            ('BIT4033', 'Elective IV', 3, 4, 3),
         ]
 
         subjects = {}
@@ -169,8 +225,8 @@ class Command(BaseCommand):
 
     def _create_rules(self, programme):
         rules = [
-            ('max_credits', 21),
-            ('probation_cap', 12),
+            ('max_credits', programme.max_credits_per_sem),
+            ('probation_cap', programme.probation_credit_cap),
             ('min_credits', 3),
             ('max_repeat', 3),
         ]
@@ -276,17 +332,21 @@ class Command(BaseCommand):
         except (User.DoesNotExist, Student.DoesNotExist):
             return
 
-        y1s1_codes = ['BCS1013', 'BCS1023', 'BIT1013', 'BIT1023', 'MPU3113', 'MPU3123', 'BEN1013']
-        y1s2_codes = ['BCS1033', 'BCS1043', 'BIT1033', 'BIT1043', 'BEN1023', 'MPU3133', 'MPU3212']
-        y2s1_codes = ['BCS2013', 'BCS2023', 'BIT2013', 'BIT2023', 'BIT2033', 'BCS2033', 'MPU3143']
-        y2s2_codes = ['BCS2043', 'BCS2053', 'BCS2063', 'BIT2043', 'BIT2053', 'BEN2013', 'BCS2072']
-        y3s1_codes = ['BCS3013', 'BCS3023', 'BCS3033', 'BCS3043', 'BIT3013', 'BIT3023', 'BIT3033']
+        y1s1_codes = ['BCS1013', 'BCS1023', 'BIT1013', 'BEN1013']
+        y1s2_codes = ['BIT1023', 'MPU3113', 'MPU3123', 'BIT1033', 'MPU3212']
+        y1s3_codes = ['BCS1033', 'BCS1043', 'BIT1043', 'BEN1023', 'MPU3133']
+        y2s1_codes = ['BCS2013', 'BIT2013', 'BIT2023', 'MPU3143']
+        y2s2_codes = ['BCS2023', 'BIT2033', 'BCS2033', 'BIT2053']
+        y2s3_codes = ['BCS2043', 'BCS2063', 'BIT2043', 'BCS2053', 'BEN2013', 'BCS2072']
+        y3s1_codes = ['BCS3033', 'BCS3043', 'BIT3013', 'BIT3023', 'BIT3033']
 
         passed_semesters = [
             ('202201', y1s1_codes),
             ('202202', y1s2_codes),
+            ('202203', y1s3_codes),
             ('202301', y2s1_codes),
             ('202302', y2s2_codes),
+            ('202303', y2s3_codes),
             ('202401', y3s1_codes),
         ]
 
@@ -324,6 +384,18 @@ class Command(BaseCommand):
                         student=siti,
                         subject=subject,
                         semester='202202',
+                        defaults={'status': 'passed', 'grade': 'B'},
+                    )
+                except Subject.DoesNotExist:
+                    pass
+
+            for code in y1s3_codes:
+                try:
+                    subject = Subject.objects.get(subject_code=code)
+                    Enrolment.objects.get_or_create(
+                        student=siti,
+                        subject=subject,
+                        semester='202203',
                         defaults={'status': 'passed', 'grade': 'B'},
                     )
                 except Subject.DoesNotExist:
@@ -366,12 +438,24 @@ class Command(BaseCommand):
             for code in y1s2_codes:
                 try:
                     subject = Subject.objects.get(subject_code=code)
+                    Enrolment.objects.get_or_create(
+                        student=david,
+                        subject=subject,
+                        semester='202202',
+                        defaults={'status': 'passed', 'grade': 'C+'},
+                    )
+                except Subject.DoesNotExist:
+                    pass
+
+            for code in y1s3_codes:
+                try:
+                    subject = Subject.objects.get(subject_code=code)
                     grade = 'D' if code in ('BCS1033', 'BCS1043') else 'C+'
                     status_val = 'failed' if code in ('BCS1033', 'BCS1043') else 'passed'
                     Enrolment.objects.get_or_create(
                         student=david,
                         subject=subject,
-                        semester='202202',
+                        semester='202203',
                         defaults={'status': status_val, 'grade': grade},
                     )
                 except Subject.DoesNotExist:

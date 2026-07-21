@@ -21,10 +21,12 @@ urlpatterns = [
     # Admin: Exception Management
     path('admin/exceptions/', views.list_exceptions, name='list-exceptions'),
     path('admin/exceptions/<int:pk>/resolve/', views.resolve_exception, name='resolve-exception'),
+    path('admin/exceptions/<int:pk>/undo/', views.undo_exception, name='undo-exception'),
 
     # Admin: Add/Drop Request Management
     path('admin/add-drop-requests/', views.list_add_drop_requests, name='list-add-drop-requests'),
     path('admin/add-drop-requests/<int:pk>/resolve/', views.resolve_add_drop_request, name='resolve-add-drop-request'),
+    path('admin/add-drop-requests/<int:pk>/undo/', views.undo_add_drop_request, name='undo-add-drop-request'),
 
     # Admin: Timetable Management
     path('admin/timetables/', views.timetable_manage, name='timetable-manage'),
@@ -32,6 +34,14 @@ urlpatterns = [
 
     # Admin: Rules
     path('admin/rules/', views.rules_manage, name='rules-manage'),
+
+    # Admin: Subject Management
+    path('admin/subjects/', views.subject_create, name='subject-create'),
+    path('admin/subjects/<str:subject_code>/', views.subject_detail, name='subject-detail'),
+
+    # Admin: Faculty and Programme Management
+    path('admin/faculties/', views.faculty_list_create, name='faculty-list-create'),
+    path('admin/programmes/create/', views.create_programme, name='create-programme'),
 
     # Shared
     path('programmes/', views.list_programmes, name='list-programmes'),
@@ -43,5 +53,7 @@ urlpatterns = [
     path('student/exceptions/', views.student_exceptions, name='student-exceptions'),
     path('student/add-drop/', views.student_submit_add_drop, name='student-add-drop'),
     path('student/add-drop/history/', views.student_add_drop_requests, name='student-add-drop-history'),
+    path('student/add-drop/<int:pk>/', views.student_edit_add_drop_request, name='student-edit-add-drop'),
+    path('student/add-drop/<int:pk>/withdraw/', views.student_withdraw_add_drop_request, name='student-withdraw-add-drop'),
     path('student/timetables/', views.student_timetables, name='student-timetables'),
 ]

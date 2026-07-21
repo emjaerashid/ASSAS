@@ -1,12 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 
 export default function AssignSubjects() {
   const [semester, setSemester] = useState('202601');
+  const [durationWeeks, setDurationWeeks] = useState('19');
+  const [facultyCode, setFacultyCode] = useState('');
+  const [faculties, setFaculties] = useState([]);
+  const [programmeCode, setProgrammeCode] = useState('');
+  const [programmes, setProgrammes] = useState([]);
   const [studentId, setStudentId] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/programmes/').then(setProgrammes).catch(console.error);
+    api.get('/admin/faculties/').then(setFaculties).catch(console.error);
+  }, []);
+
+  const visibleProgrammes = facultyCode
+    ? programmes.filter((p) => p.faculty === facultyCode)
+    : programmes;
+
+  const handleFacultyChange = (value) => {
+    setFacultyCode(value);
+    if (programmeCode && !programmes.some((p) => p.programme_code === programmeCode && (!value || p.faculty === value))) {
+      setProgrammeCode('');
+    }
+  };
 
   const handleAssign = async (e) => {
     e.preventDefault();
@@ -15,8 +36,10 @@ export default function AssignSubjects() {
     setLoading(true);
 
     try {
-      const body = { semester };
+      const body = { semester, duration_weeks: parseInt(durationWeeks) };
       if (studentId.trim()) body.student_id = studentId.trim();
+      if (programmeCode) body.programme_code = programmeCode;
+      if (facultyCode) body.faculty_code = facultyCode;
       const data = await api.post('/admin/assign/', body);
       setResults(data);
     } catch (err) {
@@ -92,11 +115,45 @@ export default function AssignSubjects() {
                   placeholder="e.g. 202601" required />
               </div>
               <div className="form-group">
-                <label>Student ID (leave empty for all students)</label>
-                <input className="form-control" value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. 202209020001" />
+                <label>Semester Duration</label>
+                <select className="form-control" value={durationWeeks}
+                  onChange={(e) => setDurationWeeks(e.target.value)}>
+                  <option value="19">19 weeks (max 6 subjects)</option>
+                  <option value="12">12 weeks (max 3 subjects)</option>
+                </select>
               </div>
+            </div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Faculty</label>
+                <select className="form-control" value={facultyCode}
+                  onChange={(e) => handleFacultyChange(e.target.value)}>
+                  <option value="">All Faculties</option>
+                  {faculties.map((f) => (
+                    <option key={f.faculty_code} value={f.faculty_code}>
+                      {f.faculty_code} - {f.faculty_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Programme</label>
+                <select className="form-control" value={programmeCode}
+                  onChange={(e) => setProgrammeCode(e.target.value)}>
+                  <option value="">All Programmes</option>
+                  {visibleProgrammes.map((p) => (
+                    <option key={p.programme_code} value={p.programme_code}>
+                      {p.programme_code} - {p.programme_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Student ID (leave empty for all students)</label>
+              <input className="form-control" value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="e.g. 202209020001" />
             </div>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Running Rule Engine...' : 'Run Subject Assignment'}

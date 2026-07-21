@@ -36,7 +36,6 @@ export default function Layout() {
               <NavLink to="/student" end>My Subjects</NavLink>
               <NavLink to="/student/progress">Progress</NavLink>
               <NavLink to="/student/add-drop">Add/Drop Request</NavLink>
-              <NavLink to="/student/exceptions">Exceptions</NavLink>
               <NavLink to="/student/timetables">Timetables</NavLink>
             </>
           )}

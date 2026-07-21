@@ -1,5 +1,15 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+
+GRADE_POINTS = {
+    'A': Decimal('4.00'), 'A-': Decimal('3.67'),
+    'B+': Decimal('3.33'), 'B': Decimal('3.00'), 'B-': Decimal('2.67'),
+    'C+': Decimal('2.33'), 'C': Decimal('2.00'), 'C-': Decimal('1.67'),
+    'D+': Decimal('1.33'), 'D': Decimal('1.00'),
+    'F': Decimal('0.00'),
+}
 
 
 class UserManager(BaseUserManager):
@@ -41,9 +51,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.student_id} - {self.full_name}"
 
 
+class Faculty(models.Model):
+    faculty_code = models.CharField(max_length=20, primary_key=True)
+    faculty_name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return f"{self.faculty_code} - {self.faculty_name}"
+
+
 class Programme(models.Model):
     programme_code = models.CharField(max_length=20, primary_key=True)
     programme_name = models.CharField(max_length=200)
+    faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, related_name='programmes', null=True, blank=True)
     total_credits = models.IntegerField(default=120)
     max_credits_per_sem = models.IntegerField(default=21)
     probation_credit_cap = models.IntegerField(default=12)
@@ -79,6 +98,54 @@ class Student(models.Model):
         if self.status == 'probation':
             return self.programme.probation_credit_cap
         return self.programme.max_credits_per_sem
+
+    def recompute_total_credits_earned(self):
+        """Recalculate total_credits_earned from passed enrolments and persist it.
+
+        Skipped for transfer students, whose earned credits may include
+        externally-verified transfer credit not represented by local
+        Enrolment records (see the 'transfer_credit' exception review flow).
+        """
+        if self.is_transfer:
+            return self.total_credits_earned
+
+        passed = self.enrolments.filter(status='passed').select_related('subject')
+        total = sum(e.subject.credit_hours for e in passed)
+        if total != self.total_credits_earned:
+            self.total_credits_earned = total
+            self.save(update_fields=['total_credits_earned'])
+        return self.total_credits_earned
+
+    def recompute_cgpa(self):
+        """Recalculate CGPA from graded enrolments (passed or failed) and persist it.
+
+        Weighted by credit hours across every graded attempt, same as
+        total_credits_earned; skipped for transfer students for the same reason.
+        """
+        if self.is_transfer:
+            return self.cgpa
+
+        graded = self.enrolments.filter(
+            status__in=['passed', 'failed'],
+        ).exclude(grade__isnull=True).exclude(grade='').select_related('subject')
+
+        total_points = Decimal('0')
+        total_credits = 0
+        for e in graded:
+            point = GRADE_POINTS.get(e.grade)
+            if point is None:
+                continue
+            total_points += point * e.subject.credit_hours
+            total_credits += e.subject.credit_hours
+
+        new_cgpa = (
+            (total_points / total_credits).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if total_credits else Decimal('0.00')
+        )
+        if new_cgpa != self.cgpa:
+            self.cgpa = new_cgpa
+            self.save(update_fields=['cgpa'])
+        return self.cgpa
 
 
 class Subject(models.Model):
@@ -140,6 +207,7 @@ class ExceptionLog(models.Model):
     REASON_CHOICES = [
         ('prerequisite_unmet', 'Prerequisite Not Met'),
         ('credit_limit_exceeded', 'Credit Limit Exceeded'),
+        ('subject_limit_exceeded', 'Subject Count Limit Exceeded'),
         ('repeat_subject', 'Repeat Subject'),
         ('probation_cap', 'Probation Credit Cap'),
         ('conflict', 'Schedule Conflict'),

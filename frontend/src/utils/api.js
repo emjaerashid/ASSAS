@@ -1,4 +1,14 @@
 const API_BASE = 'http://localhost:8000/api';
+const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
+
+// Uploaded file fields (e.g. Timetable.file) come back from the API as
+// paths relative to the Django server (e.g. "/media/timetables/x.pdf").
+// Used directly as a href/src, they'd resolve against the frontend's own
+// origin instead of the backend's, so 404. Prefix them with SERVER_BASE.
+export function resolveMediaUrl(path) {
+  if (!path || /^https?:\/\//.test(path)) return path;
+  return `${SERVER_BASE}${path}`;
+}
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;

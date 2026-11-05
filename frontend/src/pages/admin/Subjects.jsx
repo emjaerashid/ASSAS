@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import { useFeedback } from '../../context/FeedbackContext';
 
 const emptyForm = {
   subject_code: '', subject_name: '', credit_hours: 3,
-  programme: '', year: 1, semester: 1, prerequisite_codes: [],
+  programme_codes: [], semester: 1, prerequisite_codes: [],
 };
 
 export default function Subjects() {
+  const { toast, confirm } = useFeedback();
   const [subjects, setSubjects] = useState([]);
   const [programmes, setProgrammes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [programmeFilter, setProgrammeFilter] = useState('');
-  const [yearFilter, setYearFilter] = useState('');
   const [semFilter, setSemFilter] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [prerequisiteOptions, setPrerequisiteOptions] = useState([]);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function Subjects() {
         setProgrammes(data);
         if (data.length > 0) {
           setProgrammeFilter(data[0].programme_code);
-          setForm((f) => ({ ...f, programme: data[0].programme_code }));
+          setForm((f) => ({ ...f, programme_codes: [data[0].programme_code] }));
         }
       })
       .catch(console.error);
@@ -37,7 +37,6 @@ export default function Subjects() {
     if (!programmeFilter) return;
     setLoading(true);
     let query = `?programme=${programmeFilter}`;
-    if (yearFilter) query += `&year=${yearFilter}`;
     if (semFilter) query += `&semester=${semFilter}`;
 
     api.get(`/subjects/${query}`)
@@ -46,23 +45,24 @@ export default function Subjects() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(fetchSubjects, [programmeFilter, yearFilter, semFilter]);
+  useEffect(fetchSubjects, [programmeFilter, semFilter]);
 
   useEffect(() => {
-    if (!showModal || !form.programme) {
+    if (!showModal || !programmeFilter) {
       setPrerequisiteOptions([]);
       return;
     }
-    api.get(`/subjects/?programme=${form.programme}`)
+    api.get(`/subjects/?programme=${programmeFilter}`)
       .then(setPrerequisiteOptions)
       .catch(console.error);
-  }, [showModal, form.programme]);
+  }, [showModal, programmeFilter]);
 
   const selectedProgramme = programmes.find((p) => p.programme_code === programmeFilter);
 
   const openCreateModal = () => {
     setEditingCode(null);
-    setForm({ ...emptyForm, programme: programmeFilter || (programmes[0]?.programme_code ?? '') });
+    const defaultCode = programmeFilter || (programmes[0]?.programme_code ?? '');
+    setForm({ ...emptyForm, programme_codes: defaultCode ? [defaultCode] : [] });
     setError('');
     setShowModal(true);
   };
@@ -73,8 +73,7 @@ export default function Subjects() {
       subject_code: s.subject_code,
       subject_name: s.subject_name,
       credit_hours: s.credit_hours,
-      programme: s.programme,
-      year: s.year,
+      programme_codes: s.programmes.map((p) => p.programme_code),
       semester: s.semester,
       prerequisite_codes: s.prerequisites.map((p) => p.subject_code),
     });
@@ -85,29 +84,32 @@ export default function Subjects() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (form.programme_codes.length === 0) {
+      setError('Select at least one programme.');
+      return;
+    }
     try {
       if (editingCode) {
         await api.put(`/admin/subjects/${editingCode}/`, form);
-        setSuccess('Subject updated successfully!');
+        toast.success('Subject updated.');
       } else {
         await api.post('/admin/subjects/', form);
-        setSuccess('Subject created successfully!');
+        toast.success('Subject created.');
       }
       setShowModal(false);
       fetchSubjects();
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message);
     }
   };
 
   const handleDelete = async (code) => {
-    if (!confirm(`Delete subject ${code}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete subject ${code}?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
     try {
       await api.delete(`/admin/subjects/${code}/`);
       fetchSubjects();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -121,11 +123,10 @@ export default function Subjects() {
           <p>{selectedProgramme ? `${selectedProgramme.programme_name} subjects and prerequisites` : 'Programme subjects and prerequisites'}</p>
         </div>
         <button className="btn btn-primary" onClick={openCreateModal}>
-          + Add Subject
+          <span className="material-symbols-outlined">add</span>Add Subject
         </button>
       </div>
 
-      {success && <div className="alert alert-success">{success}</div>}
 
       <div className="mb-16" style={{ display: 'flex', gap: '12px' }}>
         <select className="form-control" style={{ width: '220px' }} value={programmeFilter}
@@ -134,17 +135,12 @@ export default function Subjects() {
             <option key={p.programme_code} value={p.programme_code}>{p.programme_code} - {p.programme_name}</option>
           ))}
         </select>
-        <select className="form-control" style={{ width: '150px' }} value={yearFilter}
-          onChange={(e) => setYearFilter(e.target.value)}>
-          <option value="">All Years</option>
-          {[1, 2, 3, 4].map((y) => <option key={y} value={y}>Year {y}</option>)}
-        </select>
         <select className="form-control" style={{ width: '180px' }} value={semFilter}
           onChange={(e) => setSemFilter(e.target.value)}>
           <option value="">All Semesters</option>
-          <option value="1">Semester 1</option>
-          <option value="2">Semester 2</option>
-          <option value="3">Semester 3</option>
+          {Array.from({ length: selectedProgramme?.total_semesters || 9 }, (_, i) => i + 1).map((s) => (
+            <option key={s} value={s}>Semester {s}</option>
+          ))}
         </select>
       </div>
 
@@ -159,8 +155,8 @@ export default function Subjects() {
                   <th>Code</th>
                   <th>Subject Name</th>
                   <th>Credits</th>
-                  <th>Year</th>
                   <th>Semester</th>
+                  <th>Programmes</th>
                   <th>Prerequisites</th>
                   <th>Actions</th>
                 </tr>
@@ -171,8 +167,16 @@ export default function Subjects() {
                     <td><strong>{s.subject_code}</strong></td>
                     <td>{s.subject_name}</td>
                     <td>{s.credit_hours}</td>
-                    <td>{s.year}</td>
                     <td>{s.semester}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {s.programmes.map((p) => (
+                          <span key={p.programme_code} className="badge badge-gray" title={p.programme_name}>
+                            {p.programme_code}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
                     <td>
                       {s.prerequisites.length > 0 ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -230,37 +234,50 @@ export default function Subjects() {
                       onChange={(e) => setForm({ ...form, subject_name: e.target.value })} required />
                   </div>
                 </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label>Programme</label>
-                    <select className="form-control" value={form.programme}
-                      onChange={(e) => setForm({ ...form, programme: e.target.value })} required>
-                      {programmes.map((p) => (
-                        <option key={p.programme_code} value={p.programme_code}>
-                          {p.programme_code} - {p.programme_name}
-                        </option>
-                      ))}
-                    </select>
+                <div className="form-group">
+                  <label>Programmes</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+                    {programmes.map((p) => (
+                      <label key={p.programme_code} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'normal' }}>
+                        <input
+                          type="checkbox"
+                          checked={form.programme_codes.includes(p.programme_code)}
+                          onChange={(e) => setForm({
+                            ...form,
+                            programme_codes: e.target.checked
+                              ? [...form.programme_codes, p.programme_code]
+                              : form.programme_codes.filter((c) => c !== p.programme_code),
+                          })}
+                        />
+                        {p.programme_code} - {p.programme_name}
+                      </label>
+                    ))}
                   </div>
+                  <small style={{ color: 'var(--gray-400)' }}>
+                    A subject shared across programmes (e.g. faculty-wide core courses) can belong to more than one
+                  </small>
+                </div>
+                <div className="grid-2">
                   <div className="form-group">
                     <label>Credit Hours</label>
                     <input type="number" min="1" className="form-control" value={form.credit_hours}
                       onChange={(e) => setForm({ ...form, credit_hours: parseInt(e.target.value) })} required />
                   </div>
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label>Year</label>
-                    <select className="form-control" value={form.year}
-                      onChange={(e) => setForm({ ...form, year: parseInt(e.target.value) })}>
-                      {[1, 2, 3, 4].map((y) => <option key={y} value={y}>Year {y}</option>)}
-                    </select>
-                  </div>
                   <div className="form-group">
                     <label>Semester</label>
                     <select className="form-control" value={form.semester}
                       onChange={(e) => setForm({ ...form, semester: parseInt(e.target.value) })}>
-                      {[1, 2, 3].map((s) => <option key={s} value={s}>Semester {s}</option>)}
+                      {Array.from(
+                        {
+                          length: Math.max(
+                            9,
+                            ...form.programme_codes.map(
+                              (code) => programmes.find((p) => p.programme_code === code)?.total_semesters || 9
+                            )
+                          ),
+                        },
+                        (_, i) => i + 1
+                      ).map((s) => <option key={s} value={s}>Semester {s}</option>)}
                     </select>
                   </div>
                 </div>

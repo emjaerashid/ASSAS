@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
+import { useFeedback, notifyCountsChanged } from '../../context/FeedbackContext';
 
 export default function AddDropRequests() {
+  const { toast, confirm } = useFeedback();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
@@ -27,24 +29,28 @@ export default function AddDropRequests() {
         status,
         admin_remarks: remarks[id] || '',
       });
+      toast.success(`Request ${status}.`);
+      notifyCountsChanged();
       setEditingId(null);
       fetchRequests();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleUndo = async (id) => {
-    if (!confirm('Undo this decision and return the request to pending?')) return;
+    if (!(await confirm({ title: 'Undo this decision?', message: 'The request will return to pending.', confirmLabel: 'Undo decision' }))) return;
     setActionLoading(id);
     try {
       await api.post(`/admin/add-drop-requests/${id}/undo/`, {});
+      toast.info('Decision undone — back to pending.');
+      notifyCountsChanged();
       setEditingId(null);
       fetchRequests();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setActionLoading(null);
     }

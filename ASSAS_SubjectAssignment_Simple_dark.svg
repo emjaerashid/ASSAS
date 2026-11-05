@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="1440" viewBox="0 0 1060 1440" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#1b202b"/></pattern><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.45"/></filter><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#9aa4b8"/></marker></defs>
+<rect width="100%" height="100%" fill="#0d1017"/><rect width="100%" height="100%" fill="url(#dots)"/>
+<text x="40" y="62" fill="#e6e9ef" font-size="28" font-weight="700" letter-spacing="0.3">ASSAS — Subject Assignment</text>
+<text x="40" y="92" fill="#8a93a6" font-size="15">Simplified activity diagram · how the rule engine assigns subjects to a student</text>
+<rect x="40" y="120" width="980" height="1280" rx="14" fill="#a855f7" fill-opacity="0.03" stroke="#a855f7" stroke-opacity="0.25"/>
+<path d="M440,184 L440,217.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M440,273.0 L440,313.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M440,377.0 L440,418.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M440,482.0 L440,519" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M440,551 L440,596.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M440,684.0 L440,711.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="450" y="701.0" fill="#f43f5e" font-size="12" font-weight="700" text-anchor="start">no</text>
+<path d="M440,799.0 L440,826.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="450" y="816.0" fill="#22c55e" font-size="12" font-weight="700" text-anchor="start">yes</text>
+<path d="M440,914.0 L440,941.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="450" y="931.0" fill="#22c55e" font-size="12" font-weight="700" text-anchor="start">yes</text>
+<path d="M440,1029.0 L440,1072.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="450" y="1046.0" fill="#22c55e" font-size="12" font-weight="700" text-anchor="start">yes</text>
+<path d="M440,1128.0 L440,1165.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M565.0,640 L900,640 L900,1205 L555.0,1205" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="573.0" y="632" fill="#22c55e" font-size="12" font-weight="700" text-anchor="start">yes</text>
+<path d="M565.0,755 L615,755" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round"/>
+<text x="573.0" y="747" fill="#f43f5e" font-size="12" font-weight="700" text-anchor="start">no</text>
+<path d="M565.0,870 L615,870" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round"/>
+<text x="573.0" y="862" fill="#f43f5e" font-size="12" font-weight="700" text-anchor="start">no</text>
+<path d="M565.0,985 L615,985" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round"/>
+<text x="573.0" y="977" fill="#f43f5e" font-size="12" font-weight="700" text-anchor="start">no</text>
+<path d="M615,755 L615,985" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M615,870 L650.0,870" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<path d="M760,906.0 L760,1205" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M325.0,1205 L110,1205 L110,535 L420,535" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="317.0" y="1197" fill="#22c55e" font-size="12" font-weight="700" text-anchor="end">yes</text>
+<path d="M440,1245.0 L440,1282.0" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<text x="450" y="1262.0" fill="#f43f5e" font-size="12" font-weight="700" text-anchor="start">no</text>
+<path d="M440,1338.0 L440,1367" fill="none" stroke="#9aa4b8" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#arr)"/>
+<circle cx="440" cy="170" r="14" fill="#e6e9ef"/>
+<g filter="url(#sh)"><rect x="290.0" y="217.0" width="300" height="56" rx="14" fill="#161a23" stroke="#a855f7" stroke-opacity="0.55"/></g><rect x="290.0" y="229.0" width="3.5" height="32" rx="1.75" fill="#a855f7"/><text x="440" y="250.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Select student &amp; semester</text>
+<g filter="url(#sh)"><rect x="290.0" y="313.0" width="300" height="64" rx="14" fill="#161a23" stroke="#a855f7" stroke-opacity="0.55"/></g><rect x="290.0" y="325.0" width="3.5" height="40" rx="1.75" fill="#a855f7"/><text x="440" y="342.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Get subject list</text><text x="440" y="361.0" fill="#8a93a6" font-size="12" text-anchor="middle">repeat subjects first · scheduled only</text>
+<g filter="url(#sh)"><rect x="290.0" y="418.0" width="300" height="64" rx="14" fill="#161a23" stroke="#a855f7" stroke-opacity="0.55"/></g><rect x="290.0" y="430.0" width="3.5" height="40" rx="1.75" fill="#a855f7"/><text x="440" y="447.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Remove time clashes</text><text x="440" y="466.0" fill="#8a93a6" font-size="12" text-anchor="middle">keep the subject with more credits</text>
+<polygon points="440,519 460,535 440,551 420,535" fill="#161a23" stroke="#a855f7" stroke-width="1.4"/>
+<text x="472" y="539" fill="#8a93a6" font-size="12">for each subject</text>
+<g filter="url(#sh)"><polygon points="440,596.0 565.0,640 440,684.0 315.0,640" fill="#161a23" stroke="#a855f7" stroke-opacity="0.75" stroke-width="1.4"/></g><text x="440" y="636.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">Already passed</text><text x="440" y="652.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">or assigned?</text>
+<g filter="url(#sh)"><polygon points="440,711.0 565.0,755 440,799.0 315.0,755" fill="#161a23" stroke="#a855f7" stroke-opacity="0.75" stroke-width="1.4"/></g><text x="440" y="751.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">Prerequisites</text><text x="440" y="767.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">passed?</text>
+<g filter="url(#sh)"><polygon points="440,826.0 565.0,870 440,914.0 315.0,870" fill="#161a23" stroke="#a855f7" stroke-opacity="0.75" stroke-width="1.4"/></g><text x="440" y="866.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">Within credit &amp;</text><text x="440" y="882.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">subject limit?</text>
+<g filter="url(#sh)"><polygon points="440,941.0 565.0,985 440,1029.0 315.0,985" fill="#161a23" stroke="#a855f7" stroke-opacity="0.75" stroke-width="1.4"/></g><text x="440" y="981.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">Seat</text><text x="440" y="997.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">available?</text>
+<g filter="url(#sh)"><rect x="290.0" y="1072.0" width="300" height="56" rx="14" fill="#161a23" stroke="#22c55e" stroke-opacity="0.55"/></g><rect x="290.0" y="1084.0" width="3.5" height="32" rx="1.75" fill="#22c55e"/><text x="440" y="1105.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Assign subject</text>
+<g filter="url(#sh)"><polygon points="440,1165.0 555.0,1205 440,1245.0 325.0,1205" fill="#161a23" stroke="#a855f7" stroke-opacity="0.75" stroke-width="1.4"/></g><text x="440" y="1209.5" fill="#e6e9ef" font-size="12.5" font-weight="600" text-anchor="middle">More subjects?</text>
+<rect x="735.0" y="627" width="50" height="26" rx="13" fill="#64748b" fill-opacity="0.16" stroke="#64748b" stroke-opacity="0.7"/><text x="760" y="644.5" fill="#e6e9ef" font-size="12.5" font-weight="650" text-anchor="middle">Skip</text>
+<g filter="url(#sh)"><rect x="650.0" y="834.0" width="220" height="72" rx="14" fill="#161a23" stroke="#f43f5e" stroke-opacity="0.55"/></g><rect x="650.0" y="846.0" width="3.5" height="48" rx="1.75" fill="#f43f5e"/><text x="760" y="867.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Log exception</text><text x="760" y="886.0" fill="#8a93a6" font-size="12" text-anchor="middle">for admin review</text>
+<g filter="url(#sh)"><rect x="290.0" y="1282.0" width="300" height="56" rx="14" fill="#161a23" stroke="#a855f7" stroke-opacity="0.55"/></g><rect x="290.0" y="1294.0" width="3.5" height="32" rx="1.75" fill="#a855f7"/><text x="440" y="1315.0" fill="#e6e9ef" font-size="14" font-weight="650" text-anchor="middle">Show assignment summary</text>
+<circle cx="440" cy="1385" r="17" fill="none" stroke="#e6e9ef" stroke-width="2"/><circle cx="440" cy="1385" r="10" fill="#e6e9ef"/>
+</svg>

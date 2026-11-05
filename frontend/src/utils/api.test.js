@@ -3,8 +3,8 @@ import { resolveMediaUrl } from './api';
 import api from './api';
 
 describe('resolveMediaUrl', () => {
-  it('prefixes a relative media path with the server base', () => {
-    expect(resolveMediaUrl('/media/timetables/x.pdf')).toBe('http://localhost:8000/media/timetables/x.pdf');
+  it('keeps a relative media path same-origin', () => {
+    expect(resolveMediaUrl('/media/timetables/x.pdf')).toBe('/media/timetables/x.pdf');
   });
 
   it('leaves absolute http(s) URLs untouched', () => {
@@ -42,7 +42,7 @@ describe('api request wrapper', () => {
 
     const result = await api.get('/students/');
 
-    expect(global.fetch).toHaveBeenCalledWith('http://localhost:8000/api/students/', expect.objectContaining({
+    expect(global.fetch).toHaveBeenCalledWith('/api/students/', expect.objectContaining({
       credentials: 'include',
       headers: expect.objectContaining({
         'X-CSRFToken': 'test-token',

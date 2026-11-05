@@ -46,8 +46,11 @@ ASSAS/
 │   │   ├── views.py          # REST API
 │   │   ├── urls.py           # API routes (mounted at /api/)
 │   │   ├── auth_backend.py   # Student ID + IC/Passport login
+│   │   ├── files.py          # Protected /media/ and the app's index.html fallback
 │   │   ├── tests.py
 │   │   └── management/commands/seed_data.py
+│   ├── docker-entrypoint.sh  # Container start-up: migrate, check, gunicorn
+│   ├── .env.example          # Local development settings
 │   └── requirements.txt
 ├── frontend/
 │   ├── public/               # Logo, crest, campus background
@@ -57,7 +60,10 @@ ASSAS/
 │       ├── pages/            # Home, Login, admin/*, student/*
 │       ├── utils/            # API client, semester helpers
 │       └── index.css         # Styles for the whole app
-└── Media/                    # Source images
+├── Media/                    # Source images
+├── Dockerfile                # Builds the app and runs it with gunicorn
+├── docker-compose.yml        # Single-server deployment with a data volume
+└── production.env.example    # Production settings template
 ```
 
 ## Getting started
@@ -93,7 +99,7 @@ To generate a secret key for `.env`:
 python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"
 ```
 
-Open http://localhost:3000. The frontend calls the API at `http://localhost:8000/api`, as set in `frontend/src/utils/api.js`. The backend accepts requests from ports 3000 and 5173 on `localhost` and `127.0.0.1`.
+Open http://localhost:3000. Vite forwards `/api`, `/media`, `/static` and `/django-admin` to Django on port 8000 (see `frontend/vite.config.js`). The app is therefore same-origin in development, exactly as in production.
 
 ### Signing in
 
@@ -145,16 +151,72 @@ When an administrator runs **Assign Subjects** for a semester code such as `2026
 
 Each semester's subject limit depends on its intake: January and May are 19-week semesters with 5–7 subjects, and September is a 12-week semester with 3 subjects. Subjects a student already holds for the semester count towards both the credit cap and the subject limit, so running assignment again only fills the gaps.
 
+## Deployment
+
+In production one process serves the whole site from a single domain:
+
+- **Django**, run by Gunicorn, serves the API at `/api/`.
+- **The built React app** is served from the site root. Any other URL, such as `/student/profile`, returns the app's `index.html`.
+- **Static files** are served by WhiteNoise. The app's hashed `/assets/*` files are sent compressed and cached permanently.
+- **Uploaded files** at `/media/` are only served to signed-in users. Students can open timetable files and their own photo; administrators can open everything.
+
+Put an HTTPS proxy in front, such as Caddy, nginx or your host's load balancer, and set `DJANGO_BEHIND_PROXY=True`.
+
+### With Docker
+
+```bash
+cp production.env.example production.env     # fill in the secret key, hostname and origin
+docker compose up -d --build
+docker compose exec assas python manage.py createsuperuser
+```
+
+The image builds the React app, installs the Python dependencies and collects static files. On every start it applies migrations and runs `manage.py check --deploy`, then starts Gunicorn on port 8000 as a non-root user. The database and uploads live in the `assas-data` volume at `/data`, so they survive rebuilds. Back that volume up.
+
+### Without Docker
+
+On a server with Python 3.12+ and Node 20.19+:
+
+```bash
+cd frontend && npm ci && npm run build && cd ..
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+export DJANGO_SECRET_KEY=... DJANGO_ALLOWED_HOSTS=assas.example.edu.my \
+       DJANGO_CSRF_TRUSTED_ORIGINS=https://assas.example.edu.my DJANGO_BEHIND_PROXY=True
+python manage.py collectstatic --noinput
+python manage.py migrate
+python manage.py createsuperuser
+gunicorn assas_backend.wsgi:application --bind 127.0.0.1:8000 --workers 2
+```
+
+Run Gunicorn under a process manager such as systemd so it restarts automatically. Don't run `seed_data` on a production database: it refuses to run with `DEBUG` off, because it creates `ADMIN001` with the password `ADMIN001`.
+
+### Settings
+
+Every setting comes from an environment variable. For local development, put them in `backend/.env` (see `backend/.env.example`); in production, use real environment variables or `production.env`. Both files are gitignored.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | none | Required: the server won't start without it. |
+| `DJANGO_DEBUG` | `False` | Set `True` only for local development. |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Your public hostname(s), comma-separated. |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | localhost dev ports if `DEBUG`, otherwise empty | Your public origin, e.g. `https://assas.example.edu.my`. Sign-in fails without it. |
+| `DJANGO_CORS_ALLOWED_ORIGINS` | localhost dev ports if `DEBUG`, otherwise empty | Only needed if the frontend is hosted on a different domain. |
+| `DJANGO_HTTPS` | on when `DEBUG` is off | HTTPS redirect, secure-only session and CSRF cookies, and HSTS. |
+| `DJANGO_HSTS_SECONDS` | `3600` | Raise to `31536000` (one year) once HTTPS works everywhere. |
+| `DJANGO_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_HSTS_PRELOAD` | `False` | Off by default, because they're very hard to undo once browsers cache them. |
+| `DJANGO_BEHIND_PROXY` | `False` | Set `True` when a proxy handles HTTPS in front of Django. |
+| `DJANGO_DB_PATH` | `backend/db.sqlite3` | Point at persistent storage. |
+| `DJANGO_MEDIA_ROOT` | `backend/media` | Uploaded photos and timetable files. |
+| `DJANGO_STATIC_ROOT` | `backend/staticfiles` | Where `collectstatic` writes. |
+| `DJANGO_FRONTEND_DIST` | `frontend/dist` | The built React app. |
+| `DJANGO_ENABLE_ADMIN` | same as `DEBUG` | Turns Django's built-in admin on at `/django-admin/`. |
+| `DJANGO_LOG_LEVEL` | `INFO` | Logs go to stderr, including errors that `DEBUG` would otherwise show. |
+| `VITE_API_BASE` | `/api` | Frontend build-time setting, only for a separately hosted API. |
+
+With production settings, `python manage.py check --deploy` reports only the two opt-in HSTS options.
+
 ## Notes
 
-- **Settings come from the environment.** `backend/assas_backend/settings.py` reads `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS`, from real environment variables or from `backend/.env`, which is gitignored.
-
-  | Variable | Default | Notes |
-  |---|---|---|
-  | `DJANGO_SECRET_KEY` | none | Required: the server won't start without it. |
-  | `DJANGO_DEBUG` | `False` | Set `True` only for local development. |
-  | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated. |
-
-  For a public deployment, also turn on the HTTPS settings that `python manage.py check --deploy` lists.
-- **Local data stays out of Git.** `db.sqlite3` and uploaded files in `backend/media/` are excluded by `.gitignore`. The committed `db.sqlite3.bak-*` files are database snapshots: they contain student IC/Passport numbers in plain text, so keep this repository private.
+- **Local data stays out of Git.** `db.sqlite3`, the `db.sqlite3.bak-*` snapshots, `.env` files and uploads in `backend/media/` are all gitignored. They hold student IC/Passport numbers and photos, so back them up somewhere other than this repository.
 - **Icon font.** Material Symbols is loaded with only the weights the app uses, to keep the download small. `frontend/src/test/iconFont.test.js` fails if any `font-variation-settings` value in the code falls outside the range requested in `frontend/index.html`, and names the value to add.

@@ -1,4 +1,5 @@
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
 from core.models import Enrolment, Faculty, Prerequisite, Programme, Rule, Student, Subject, User
 
@@ -119,7 +120,20 @@ FAILING_GRADES = {'F', 'D'}
 class Command(BaseCommand):
     help = 'Seed the database with the Faculty of IT programme structure and sample students'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--allow-production', action='store_true',
+            help='Run even with DEBUG off. Creates ADMIN001 with password ADMIN001 - change it immediately.',
+        )
+
     def handle(self, *args, **options):
+        # The sample admin's password is public (ADMIN001), so never seed a
+        # production database by accident.
+        if not settings.DEBUG and not options['allow_production']:
+            raise CommandError(
+                'Refusing to seed with DEBUG off: this creates an ADMIN001 account whose password is ADMIN001. '
+                'Create a real administrator with `manage.py createsuperuser`, or pass --allow-production.'
+            )
         self.stdout.write('Seeding Faculty of Information Technology data...')
 
         faculty = self._create_faculty()

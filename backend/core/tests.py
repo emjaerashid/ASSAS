@@ -743,9 +743,11 @@ class SeedDataCommandTests(TestCase):
         from io import StringIO
         from django.core.management import call_command
 
-        call_command('seed_data', stdout=StringIO())
+        # The test runner forces DEBUG off, which is exactly the case the
+        # production guard covers.
+        call_command('seed_data', allow_production=True, stdout=StringIO())
         counts = (Subject.objects.count(), Enrolment.objects.count(), Student.objects.count())
-        call_command('seed_data', stdout=StringIO())
+        call_command('seed_data', allow_production=True, stdout=StringIO())
 
         self.assertEqual((Subject.objects.count(), Enrolment.objects.count(), Student.objects.count()), counts)
         self.assertEqual(counts[2], 5)
@@ -755,3 +757,77 @@ class SeedDataCommandTests(TestCase):
         nuru = Student.objects.get(user__student_id='202209020002')
         self.assertGreater(nuru.total_credits_earned, 0)
         self.assertGreater(nuru.cgpa, 0)
+
+    def test_refuses_to_run_with_debug_off_unless_allowed(self):
+        from django.core.management import CommandError, call_command
+
+        with self.assertRaisesMessage(CommandError, 'Refusing to seed'):
+            call_command('seed_data')
+        self.assertFalse(User.objects.filter(student_id='ADMIN001').exists())
+
+
+class ProtectedMediaTests(TestCase):
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from django.test import override_settings
+        from rest_framework.test import APIClient
+
+        self.media = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.media, True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+
+        for rel in ('student_photos/mine.jpg', 'student_photos/theirs.jpg', 'timetables/tt.pdf'):
+            (self.media / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.media / rel).write_bytes(b'file:' + rel.encode())
+
+        programme = make_programme()
+        self.me = make_student('S100', programme)
+        self.me.photo.name = 'student_photos/mine.jpg'
+        self.me.save()
+        other = make_student('S200', programme)
+        other.photo.name = 'student_photos/theirs.jpg'
+        other.save()
+        self.admin = make_user('ADM1', role='admin', is_staff=True)
+        self.client = APIClient()
+
+    def get(self, rel):
+        return self.client.get(f'/media/{rel}')
+
+    def test_signed_out_visitors_get_nothing(self):
+        self.assertEqual(self.get('student_photos/mine.jpg').status_code, 403)
+        self.assertEqual(self.get('timetables/tt.pdf').status_code, 403)
+
+    def test_student_sees_own_photo_and_timetables_only(self):
+        self.client.force_login(self.me.user)
+        response = self.get('student_photos/mine.jpg')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b''.join(response.streaming_content), b'file:student_photos/mine.jpg')
+        self.assertEqual(self.get('timetables/tt.pdf').status_code, 200)
+        self.assertEqual(self.get('student_photos/theirs.jpg').status_code, 404)
+        self.assertEqual(self.get('student_photos/../timetables/../student_photos/theirs.jpg').status_code, 404)
+        self.assertEqual(self.get('../manage.py').status_code, 404)
+
+    def test_admin_sees_everything(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.get('student_photos/theirs.jpg').status_code, 200)
+        self.assertEqual(self.get('student_photos/missing.jpg').status_code, 404)
+
+
+class SpaFallbackTests(TestCase):
+    def test_client_routes_return_the_app_and_api_stays_json(self):
+        import tempfile
+        from pathlib import Path
+        from django.test import override_settings
+
+        dist = Path(tempfile.mkdtemp())
+        (dist / 'index.html').write_text('<div id="root"></div>')
+        with override_settings(FRONTEND_DIST=dist):
+            for url in ('/', '/login', '/student/profile'):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200, url)
+                self.assertContains(response, 'id="root"')
+        self.assertEqual(self.client.get('/api/does-not-exist/').status_code, 404)

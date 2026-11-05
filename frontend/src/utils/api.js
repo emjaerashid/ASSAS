@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:8000/api';
+// Same-origin by default: in production Django serves the app and /api from
+// one domain, and in development Vite proxies /api and /media to Django (see
+// vite.config.js). VITE_API_BASE overrides it for a separately hosted API.
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
 
 // Uploaded file fields (e.g. Timetable.file) come back from the API as

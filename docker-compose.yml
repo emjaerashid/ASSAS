@@ -1,0 +1,15 @@
+# Single-server deployment: one container serves the whole site on port 8000.
+# Put an HTTPS-terminating proxy (Caddy, nginx, or your host's load balancer)
+# in front, and set DJANGO_BEHIND_PROXY=True in production.env.
+services:
+  assas:
+    build: .
+    env_file: production.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - assas-data:/data
+    restart: unless-stopped
+
+volumes:
+  assas-data:

@@ -125,6 +125,10 @@ class Command(BaseCommand):
             '--allow-production', action='store_true',
             help='Run even with DEBUG off. Creates ADMIN001 with password ADMIN001 - change it immediately.',
         )
+        parser.add_argument(
+            '--admin-password', default=None,
+            help="Password for the ADMIN001 account instead of the public default 'ADMIN001'.",
+        )
 
     def handle(self, *args, **options):
         # The sample admin's password is public (ADMIN001), so never seed a
@@ -141,7 +145,7 @@ class Command(BaseCommand):
         self._create_other_programmes(faculty)
         subjects = self._create_subjects(programme)
         self._create_prerequisites(subjects)
-        self._create_admin()
+        self._create_admin(options['admin_password'])
         self._create_sample_students(programme, subjects)
 
         self.stdout.write(self.style.SUCCESS('Seed data created successfully!'))
@@ -219,7 +223,7 @@ class Command(BaseCommand):
                 defaults={'rule_value': value, 'is_active': True},
             )
 
-    def _create_admin(self):
+    def _create_admin(self, password=None):
         admin_user, created = User.objects.get_or_create(
             student_id='ADMIN001',
             defaults={
@@ -230,10 +234,10 @@ class Command(BaseCommand):
                 'is_superuser': True,
             },
         )
-        if created:
-            admin_user.set_password('ADMIN001')
+        if created or password:
+            admin_user.set_password(password or 'ADMIN001')
             admin_user.save()
-            self.stdout.write('  Admin user: ADMIN001 / ADMIN001')
+            self.stdout.write('  Admin user: ADMIN001' + ('' if password else ' / ADMIN001'))
         else:
             self.stdout.write('  Admin user already exists')
 

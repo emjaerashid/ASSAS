@@ -1,0 +1,23 @@
+# Render Blueprint: Dashboard -> New -> Blueprint, then pick this repo.
+# Free plan caveat: there is no persistent disk, so the database and uploads
+# reset whenever the service restarts or wakes from sleep. DJANGO_SEED_DEMO
+# reloads the sample data on every start so the demo always works.
+services:
+  - type: web
+    name: assas
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_BEHIND_PROXY
+        value: "True"
+      - key: DJANGO_SEED_DEMO
+        value: "True"
+      # Password for the ADMIN001 account; Render asks for it on first deploy.
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: GUNICORN_WORKERS
+        value: "1"

@@ -150,6 +150,13 @@ CORS_ALLOWED_ORIGINS = _env_list('DJANGO_CORS_ALLOWED_ORIGINS', _LOCAL_ORIGINS i
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = _env_list('DJANGO_CSRF_TRUSTED_ORIGINS', _LOCAL_ORIGINS if DEBUG else [])
 
+# Render sets RENDER_EXTERNAL_HOSTNAME (e.g. assas.onrender.com) on every
+# web service, so its own address works without extra configuration.
+_RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if _RENDER_HOST:
+    ALLOWED_HOSTS.append(_RENDER_HOST)
+    CSRF_TRUSTED_ORIGINS.append(f'https://{_RENDER_HOST}')
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kuala_Lumpur'
 USE_I18N = True
@@ -199,6 +206,9 @@ LOGGING = {
     'root': {'handlers': ['console'], 'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO')},
     'loggers': {
         'django.request': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        # Bots probing with other Host headers already get a 400; logging a
+        # traceback for each would bury real errors.
+        'django.security.DisallowedHost': {'handlers': [], 'level': 'CRITICAL', 'propagate': False},
     },
 }
 

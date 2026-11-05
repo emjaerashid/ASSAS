@@ -61,6 +61,7 @@ ASSAS/
 │       ├── utils/            # API client, semester helpers
 │       └── index.css         # Styles for the whole app
 ├── Media/                    # Source images
+├── deploy/pythonanywhere/setup.sh  # One-command PythonAnywhere setup and update
 ├── Dockerfile                # Builds the app and runs it with gunicorn
 ├── docker-compose.yml        # Single-server deployment with a data volume
 └── production.env.example    # Production settings template
@@ -171,6 +172,46 @@ docker compose exec assas python manage.py createsuperuser
 ```
 
 The image builds the React app, installs the Python dependencies and collects static files. On every start it applies migrations and runs `manage.py check --deploy`, then starts Gunicorn on port 8000 as a non-root user. The database and uploads live in the `assas-data` volume at `/data`, so they survive rebuilds. Back that volume up.
+
+### On PythonAnywhere (free Beginner account)
+
+PythonAnywhere runs Django directly, and its disk keeps the database and uploads between restarts. `deploy/pythonanywhere/setup.sh` does the whole server setup and is safe to re-run, which also makes it the update command:
+
+- installs the Python packages into `~/.virtualenvs/assas`;
+- unpacks the uploaded frontend;
+- writes `backend/.env` with a new secret key;
+- migrates the database, collects static files and runs the deployment checks;
+- creates the first administrator;
+- writes the WSGI file and reloads the site.
+
+1. **On your computer**, build the frontend:
+   ```bash
+   cd frontend && npm run build && zip -r dist.zip dist
+   ```
+2. **On PythonAnywhere**, upload `dist.zip` to your home directory on the **Files** tab.
+3. **Open a Bash console** and run:
+   ```bash
+   git clone https://github.com/emjaerashid/ASSAS.git
+   bash ~/ASSAS/deploy/pythonanywhere/setup.sh
+   ```
+4. **Create the web app.** On the **Web** tab, choose **Add a new web app → Manual configuration**, with the Python version the script printed. Then set:
+   - **Source code:** `/home/USERNAME/ASSAS/backend`
+   - **Virtualenv:** `/home/USERNAME/.virtualenvs/assas`
+   - **Static files:** URL `/static/` to `/home/USERNAME/ASSAS/backend/staticfiles`
+   - **Force HTTPS:** on
+5. **Run `setup.sh` again.** This time it writes the WSGI file and reloads the site, which goes live at `https://USERNAME.pythonanywhere.com`.
+
+For a demo, run the first setup as `PA_SEED_DEMO=1 bash ~/ASSAS/deploy/pythonanywhere/setup.sh`. That loads the sample faculty, subjects and students, then asks you for a new `ADMIN001` password.
+
+Don't add a static mapping for `/media/`: it would serve student photos without the sign-in check. EU accounts should run `PA_DOMAIN=USERNAME.eu.pythonanywhere.com bash ...`.
+
+To update later: `cd ~/ASSAS && git pull && bash deploy/pythonanywhere/setup.sh`, after uploading a new `dist.zip` if the frontend changed. Free web apps expire after a month unless you click **Run until 1 month from today** on the Web tab.
+
+### On Render (free demo)
+
+`render.yaml` sets up a free Render web service from the `Dockerfile`. In the Render dashboard, choose **New → Blueprint**, pick this repo, and enter a `DJANGO_SUPERUSER_PASSWORD` when asked. Render supplies the HTTPS address, which Django picks up from `RENDER_EXTERNAL_HOSTNAME`.
+
+Render's free plan has **no persistent disk**. The database and uploads reset whenever the service restarts, including when it wakes after 15 minutes without visitors. To keep the demo usable, `DJANGO_SEED_DEMO=True` reloads the sample data on every start. Sign in as `ADMIN001` with your `DJANGO_SUPERUSER_PASSWORD`; seeded students use the IC numbers in `seed_data.py`. Anything you add is lost on the next restart, so use a host with a persistent volume for real use.
 
 ### Without Docker
 

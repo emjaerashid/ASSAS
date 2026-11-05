@@ -1,7 +1,16 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.validators import RegexValidator
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+
+# Registration-period semester codes are <academic year><intake month>:
+# Semester 1 -> January (01), Semester 2 -> May (05), Semester 3 -> September (09).
+# e.g. 202401 = 2024 Semester 1.
+validate_semester_code = RegexValidator(
+    regex=r'^\d{4}(01|05|09)$',
+    message='Semester code must be <year><01|05|09>, e.g. 202401.',
+)
 
 GRADE_POINTS = {
     'A': Decimal('4.00'), 'A-': Decimal('3.67'),
@@ -66,7 +75,7 @@ class Programme(models.Model):
     total_credits = models.IntegerField(default=120)
     max_credits_per_sem = models.IntegerField(default=21)
     probation_credit_cap = models.IntegerField(default=12)
-    total_semesters = models.IntegerField(default=8)
+    total_semesters = models.IntegerField(default=9)
 
     def __str__(self):
         return f"{self.programme_code} - {self.programme_name}"
@@ -82,13 +91,20 @@ class Student(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
     programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='students')
-    current_year = models.IntegerField(default=1)
+    photo = models.ImageField(upload_to='student_photos/', null=True, blank=True)
     current_semester = models.IntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     total_credits_earned = models.IntegerField(default=0)
     cgpa = models.DecimalField(max_digits=4, decimal_places=2, default=0.00)
     is_repeat = models.BooleanField(default=False)
     is_transfer = models.BooleanField(default=False)
+
+    # Direct accessor for the student-subject relationship, backed by the
+    # existing Enrolment rows rather than a new join table: this adds no
+    # column and no second source of truth, it just exposes
+    # student.subjects.all() / subject.students.all() alongside the
+    # existing student.enrolments / subject.enrolments.
+    subjects = models.ManyToManyField('Subject', through='Enrolment', related_name='students')
 
     def __str__(self):
         return f"{self.user.student_id} - {self.user.full_name}"
@@ -149,15 +165,17 @@ class Student(models.Model):
 
 
 class Subject(models.Model):
+    # Many-to-many because a subject (esp. shared faculty-wide courses, e.g.
+    # the "BIT"-prefixed ones) can legitimately belong to more than one
+    # programme's curriculum at once, rather than being duplicated per programme.
     subject_code = models.CharField(max_length=20, primary_key=True)
     subject_name = models.CharField(max_length=200)
     credit_hours = models.IntegerField(default=3)
-    programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='subjects')
-    year = models.IntegerField()
+    programmes = models.ManyToManyField(Programme, related_name='subjects')
     semester = models.IntegerField()
 
     class Meta:
-        ordering = ['year', 'semester', 'subject_code']
+        ordering = ['semester', 'subject_code']
 
     def __str__(self):
         return f"{self.subject_code} - {self.subject_name}"
@@ -185,7 +203,7 @@ class Enrolment(models.Model):
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='enrolments')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='enrolments')
-    semester = models.CharField(max_length=10, help_text='e.g. 202601')
+    semester = models.CharField(max_length=10, help_text='e.g. 202401', validators=[validate_semester_code])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
     grade = models.CharField(max_length=5, blank=True, null=True)
     is_repeat = models.BooleanField(default=False)
@@ -211,6 +229,7 @@ class ExceptionLog(models.Model):
         ('repeat_subject', 'Repeat Subject'),
         ('probation_cap', 'Probation Credit Cap'),
         ('conflict', 'Schedule Conflict'),
+        ('class_full', 'Class Capacity Full'),
         ('transfer_credit', 'Transfer Credit Review'),
         ('other', 'Other'),
     ]
@@ -265,7 +284,7 @@ class AddDropRequest(models.Model):
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     reason = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    semester = models.CharField(max_length=10)
+    semester = models.CharField(max_length=10, validators=[validate_semester_code])
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_requests')
     reviewed_at = models.DateTimeField(null=True, blank=True)
     admin_remarks = models.TextField(blank=True)
@@ -280,9 +299,12 @@ class AddDropRequest(models.Model):
 
 class Timetable(models.Model):
     title = models.CharField(max_length=200)
-    programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='timetables')
-    semester = models.CharField(max_length=10)
-    file = models.FileField(upload_to='timetables/')
+    # Many-to-many so one timetable (and its time slots) can serve multiple
+    # programmes at once, matching how Subject.programmes already works for
+    # shared subjects, rather than duplicating the same schedule per programme.
+    programmes = models.ManyToManyField(Programme, related_name='timetables')
+    semester = models.CharField(max_length=10, validators=[validate_semester_code])
+    file = models.FileField(upload_to='timetables/', null=True, blank=True)
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_timetables')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -291,3 +313,50 @@ class Timetable(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.semester}"
+
+
+class Venue(models.Model):
+    """A physical classroom/venue and how many students it can seat. Matched
+    against TimeSlot.venue by name (case/whitespace-insensitively, same as
+    TimeSlot.overlaps) to cap how many students the rule engine can assign
+    into a class held there; a TimeSlot.venue with no matching row here is
+    treated as uncapped."""
+
+    name = models.CharField(max_length=100, primary_key=True)
+    capacity = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.name} (cap {self.capacity})"
+
+
+class TimeSlot(models.Model):
+    """A subject's class time within an uploaded Timetable, entered manually
+    by the admin so the system can detect clashing schedules."""
+
+    DAY_CHOICES = [
+        ('mon', 'Monday'), ('tue', 'Tuesday'), ('wed', 'Wednesday'),
+        ('thu', 'Thursday'), ('fri', 'Friday'), ('sat', 'Saturday'), ('sun', 'Sunday'),
+    ]
+
+    timetable = models.ForeignKey(Timetable, on_delete=models.CASCADE, related_name='time_slots')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='time_slots')
+    day_of_week = models.CharField(max_length=3, choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    venue = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ['day_of_week', 'start_time']
+
+    def __str__(self):
+        return f"{self.subject.subject_code} {self.day_of_week} {self.start_time}-{self.end_time}"
+
+    def overlaps(self, other):
+        """Same day, overlapping time range, and the same venue - different
+        venues can legitimately host different classes at the same time."""
+        return (
+            self.day_of_week == other.day_of_week
+            and self.start_time < other.end_time
+            and other.start_time < self.end_time
+            and self.venue.strip().lower() == other.venue.strip().lower()
+        )

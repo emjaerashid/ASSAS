@@ -31,11 +31,16 @@ export default function Progress() {
         </div>
         <div className="stat-card sky">
           <div className="stat-label">Current Position</div>
-          <div className="stat-value" style={{ fontSize: '18px' }}>Year: {student.current_year}<br />Semester: {student.current_semester}</div>
+          <div className="stat-value" style={{ fontSize: '18px' }}>Semester: {student.current_semester}</div>
         </div>
         <div className="stat-card sky">
           <div className="stat-label">Status</div>
-          <div className="stat-value" style={{ fontSize: '18px', textTransform: 'capitalize', color: student.status === 'active' ? '#10B981' : undefined }}>{student.status}</div>
+          <div>
+            <span className={`badge ${student.status === 'active' ? 'badge-green' : student.status === 'probation' ? 'badge-yellow' : 'badge-gray'}`}
+              style={{ fontSize: '13px', padding: '4px 12px' }}>
+              {student.status}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -45,7 +50,7 @@ export default function Progress() {
           <span>{total_credits_earned} / {total_credits_required} credits</span>
         </div>
         <div className="card-body">
-          <div className="progress-bar-container" style={{ height: '24px', marginBottom: '12px' }}>
+          <div className="progress-bar-container" style={{ height: '12px', marginBottom: '12px' }}>
             <div className="progress-bar-fill sky" style={{ width: `${Math.min(progress_percentage, 100)}%` }}></div>
           </div>
           <div className="flex-between">
@@ -65,7 +70,7 @@ export default function Progress() {
           <span>{completed_subjects} / {total_programme_subjects} subjects passed</span>
         </div>
         <div className="card-body">
-          <div className="progress-bar-container" style={{ height: '24px', marginBottom: '12px' }}>
+          <div className="progress-bar-container" style={{ height: '12px', marginBottom: '12px' }}>
             <div className="progress-bar-fill red"
               style={{ width: `${total_programme_subjects > 0 ? (completed_subjects / total_programme_subjects * 100) : 0}%` }}>
             </div>

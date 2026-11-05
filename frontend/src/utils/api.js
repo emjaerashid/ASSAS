@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:8000/api';
+// Same-origin by default: in production Django serves the app and /api from
+// one domain, and in development Vite proxies /api and /media to Django (see
+// vite.config.js). VITE_API_BASE overrides it for a separately hosted API.
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
 
 // Uploaded file fields (e.g. Timetable.file) come back from the API as
@@ -15,6 +18,23 @@ function getCookie(name) {
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
   return null;
+}
+
+// DRF returns { error: "..." } or { detail: "..." } for view-level errors,
+// but serializer validation failures (e.g. is_valid(raise_exception=True))
+// come back as { field_name: ["message", ...], ... } instead - without this,
+// those fall through to a generic, unhelpful "Request failed".
+function extractErrorMessage(data) {
+  if (!data || typeof data !== 'object') return 'Request failed';
+  if (data.error) return data.error;
+  if (data.detail) return data.detail;
+
+  const messages = Object.entries(data).flatMap(([field, value]) => {
+    const texts = Array.isArray(value) ? value : [value];
+    return texts.map((text) => (field === 'non_field_errors' ? text : `${field}: ${text}`));
+  });
+
+  return messages.length ? messages.join(' ') : 'Request failed';
 }
 
 async function request(path, options = {}) {
@@ -39,8 +59,7 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = data?.error || data?.detail || 'Request failed';
-    throw new Error(message);
+    throw new Error(extractErrorMessage(data));
   }
 
   return data;
@@ -56,7 +75,7 @@ const api = {
   put: (path, body) =>
     request(path, {
       method: 'PUT',
-      body: JSON.stringify(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     }),
   delete: (path) => request(path, { method: 'DELETE' }),
 };

@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../utils/api';
+import { useFeedback, notifyCountsChanged } from '../../context/FeedbackContext';
+import SemesterFields from '../../components/SemesterFields';
+import { currentSemesterCode, semesterIntake } from '../../utils/semester';
+
+function needsAttention(result) {
+  return result.underload || result.exceptions.length > 0;
+}
 
 export default function AssignSubjects() {
-  const [semester, setSemester] = useState('202601');
-  const [durationWeeks, setDurationWeeks] = useState('19');
+  const { toast } = useFeedback();
+  const [semester, setSemester] = useState(currentSemesterCode);
   const [facultyCode, setFacultyCode] = useState('');
   const [faculties, setFaculties] = useState([]);
   const [programmeCode, setProgrammeCode] = useState('');
   const [programmes, setProgrammes] = useState([]);
-  const [studentId, setStudentId] = useState('');
   const [results, setResults] = useState(null);
+  const [attentionOnly, setAttentionOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,6 +25,8 @@ export default function AssignSubjects() {
     api.get('/programmes/').then(setProgrammes).catch(console.error);
     api.get('/admin/faculties/').then(setFaculties).catch(console.error);
   }, []);
+
+  const intake = semesterIntake(semester);
 
   const visibleProgrammes = facultyCode
     ? programmes.filter((p) => p.faculty === facultyCode)
@@ -36,12 +46,14 @@ export default function AssignSubjects() {
     setLoading(true);
 
     try {
-      const body = { semester, duration_weeks: parseInt(durationWeeks) };
-      if (studentId.trim()) body.student_id = studentId.trim();
+      const body = { semester, duration_weeks: intake?.durationWeeks };
       if (programmeCode) body.programme_code = programmeCode;
       if (facultyCode) body.faculty_code = facultyCode;
       const data = await api.post('/admin/assign/', body);
       setResults(data);
+      setAttentionOnly(data.results.some(needsAttention));
+      notifyCountsChanged();
+      toast.success(`Assignment completed for ${data.total_students} student(s).`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -52,16 +64,47 @@ export default function AssignSubjects() {
   const renderSingleResult = (result) => (
     <div className="card mb-24" key={result.student_id}>
       <div className="card-header">
-        <h3>Student: {result.student_id}</h3>
-        <span className="badge badge-blue">{result.assigned_credits} credits assigned</span>
+        <h3>
+          {result.student_name || result.student_id}
+          {result.student_name && (
+            <span className="mono" style={{ marginLeft: '8px', fontWeight: 400, color: 'var(--gray-500)', fontSize: '12.5px' }}>
+              {result.student_id}
+            </span>
+          )}
+        </h3>
+        <div className="btn-group">
+          {result.underload && (
+            <span className="badge badge-red" title={`Fewer than the required ${result.min_subjects_required} subjects for this semester`}>
+              Underload
+            </span>
+          )}
+          {result.exceptions.length > 0 && (
+            <span className="badge badge-yellow">{result.exceptions.length} exception(s)</span>
+          )}
+          {result.skipped ? (
+            <span className="badge badge-gray">Already assigned — skipped</span>
+          ) : (
+            <span className="badge badge-blue">{result.assigned_credits} credits assigned</span>
+          )}
+        </div>
       </div>
       <div className="card-body">
+        {result.skipped && (
+          <p style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--gray-500)' }}>
+            This student already has subjects assigned for semester {result.semester}; assignment was not repeated.
+          </p>
+        )}
+        {result.underload && (
+          <p style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--red)' }}>
+            Only {result.assigned.length} subject(s) assigned — below the minimum of {result.min_subjects_required} for this semester. Review for missing time slots, unmet prerequisites, or exceptions.
+          </p>
+        )}
         {result.assigned.length > 0 && (
           <div className="mb-16">
-            <strong>Assigned Subjects:</strong>
+            <strong>{result.skipped ? 'Existing Assigned Subjects:' : 'Assigned Subjects:'}</strong>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
               {result.assigned.map((code) => (
-                <span key={code} className="badge badge-green">{code}</span>
+                <span key={code} className={`mono ${result.skipped ? 'badge badge-blue' : 'badge badge-green'}`}>{code}</span>
               ))}
             </div>
           </div>
@@ -69,38 +112,56 @@ export default function AssignSubjects() {
         {result.exceptions.length > 0 && (
           <div>
             <strong>Exceptions Flagged:</strong>
-            <table style={{ marginTop: '8px' }}>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Reason</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.exceptions.map((ex, i) => (
-                  <tr key={i}>
-                    <td><span className="badge badge-red">{ex.subject_code}</span></td>
-                    <td>{ex.reason.replace(/_/g, ' ')}</td>
-                    <td style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{ex.details}</td>
+            <div className="card table-container" style={{ marginTop: '8px', boxShadow: 'none' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Current Semester</th>
+                    <th>Subject</th>
+                    <th>Reason</th>
+                    <th>Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {result.exceptions.map((ex, i) => (
+                    <tr key={i}>
+                      <td className="mono">{result.student_id}</td>
+                      <td>{result.student_name}</td>
+                      <td>Semester {result.current_semester}</td>
+                      <td><span className="badge badge-red mono">{ex.subject_code}</span></td>
+                      <td style={{ textTransform: 'capitalize' }}>{ex.reason.replace(/_/g, ' ')}</td>
+                      <td style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{ex.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
-        {result.assigned.length === 0 && result.exceptions.length === 0 && (
+        {!result.skipped && result.assigned.length === 0 && result.exceptions.length === 0 && (
           <p className="empty-state">No subjects to assign for this semester.</p>
         )}
       </div>
     </div>
   );
 
+  const summary = results && {
+    assigned: results.results.reduce((n, r) => n + (r.skipped ? 0 : r.assigned.length), 0),
+    exceptions: results.results.reduce((n, r) => n + r.exceptions.length, 0),
+    underload: results.results.filter((r) => r.underload).length,
+    skipped: results.results.filter((r) => r.skipped).length,
+  };
+  const shownResults = results
+    ? results.results.filter((r) => !attentionOnly || needsAttention(r))
+    : [];
+
   return (
     <div>
       <div className="page-header">
         <h1>Assign Subjects</h1>
-        <p>Trigger the rule engine to automatically assign subjects to students</p>
+        <p>Run the rule engine to assign subjects to every eligible student automatically</p>
       </div>
 
       <div className="card mb-24">
@@ -108,22 +169,15 @@ export default function AssignSubjects() {
           <form onSubmit={handleAssign}>
             {error && <div className="alert alert-error">{error}</div>}
             <div className="grid-2">
-              <div className="form-group">
-                <label>Semester Code</label>
-                <input className="form-control" value={semester}
-                  onChange={(e) => setSemester(e.target.value)}
-                  placeholder="e.g. 202601" required />
+              <div>
+                <SemesterFields value={semester} onChange={setSemester} />
+                {intake && (
+                  <p className="form-hint" style={{ marginTop: '-10px', marginBottom: '16px' }}>
+                    Code <span className="mono">{semester}</span> · {intake.durationWeeks}-week semester
+                    · {intake.minSubjects === intake.maxSubjects ? intake.maxSubjects : `${intake.minSubjects}–${intake.maxSubjects}`} subjects per student
+                  </p>
+                )}
               </div>
-              <div className="form-group">
-                <label>Semester Duration</label>
-                <select className="form-control" value={durationWeeks}
-                  onChange={(e) => setDurationWeeks(e.target.value)}>
-                  <option value="19">19 weeks (max 6 subjects)</option>
-                  <option value="12">12 weeks (max 3 subjects)</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid-2">
               <div className="form-group">
                 <label>Faculty</label>
                 <select className="form-control" value={facultyCode}
@@ -136,6 +190,8 @@ export default function AssignSubjects() {
                   ))}
                 </select>
               </div>
+            </div>
+            <div className="grid-2">
               <div className="form-group">
                 <label>Programme</label>
                 <select className="form-control" value={programmeCode}
@@ -149,14 +205,10 @@ export default function AssignSubjects() {
                 </select>
               </div>
             </div>
-            <div className="form-group">
-              <label>Student ID (leave empty for all students)</label>
-              <input className="form-control" value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                placeholder="e.g. 202209020001" />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Running Rule Engine...' : 'Run Subject Assignment'}
+            <button type="submit" className="btn btn-primary" disabled={loading || !intake}>
+              {loading
+                ? <><span className="spinner" />Running Rule Engine...</>
+                : <><span className="material-symbols-outlined">bolt</span>Run Subject Assignment</>}
             </button>
           </form>
         </div>
@@ -164,15 +216,44 @@ export default function AssignSubjects() {
 
       {results && (
         <div>
-          {results.results ? (
-            <>
-              <div className="alert alert-success">
-                Assignment completed for {results.total_students} student(s) in semester {results.semester}.
-              </div>
-              {results.results.map(renderSingleResult)}
-            </>
-          ) : (
-            renderSingleResult(results)
+          <div className="result-summary">
+            <div className="stat-card">
+              <div className="stat-label">Students processed</div>
+              <div className="stat-value">{results.total_students}</div>
+            </div>
+            <div className="stat-card green">
+              <div className="stat-label">Subjects assigned</div>
+              <div className="stat-value">{summary.assigned}</div>
+            </div>
+            <div className="stat-card amber">
+              <div className="stat-label">Exceptions flagged</div>
+              <div className="stat-value">{summary.exceptions}</div>
+            </div>
+            <div className="stat-card red">
+              <div className="stat-label">Underloaded</div>
+              <div className="stat-value">{summary.underload}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Skipped</div>
+              <div className="stat-value">{summary.skipped}</div>
+            </div>
+          </div>
+
+          <div className="flex-between mb-16" style={{ gap: '12px', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={attentionOnly} onChange={(e) => setAttentionOnly(e.target.checked)} />
+              Only show students that need attention
+            </label>
+            {summary.exceptions > 0 && (
+              <Link className="btn btn-secondary btn-sm" to="/admin/exceptions">
+                <span className="material-symbols-outlined">flag</span>Review {summary.exceptions} exception(s)
+              </Link>
+            )}
+          </div>
+
+          {shownResults.map(renderSingleResult)}
+          {shownResults.length === 0 && (
+            <div className="card"><p className="empty-state">Every student was assigned cleanly — nothing needs attention.</p></div>
           )}
         </div>
       )}

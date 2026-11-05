@@ -1,12 +1,16 @@
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path, re_path
+
+from core.files import protected_media, spa_index
 
 urlpatterns = [
-    path('django-admin/', admin.site.urls),
     path('api/', include('core.urls')),
+    re_path(r'^media/(?P<path>.+)$', protected_media, name='protected-media'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.ENABLE_DJANGO_ADMIN:
+    urlpatterns.append(path('django-admin/', admin.site.urls))
+
+# Anything else is a client-side route of the React app.
+urlpatterns.append(re_path(r'^(?!api/|media/|static/|django-admin/).*$', spa_index, name='spa'))

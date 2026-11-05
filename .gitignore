@@ -4,7 +4,11 @@ __pycache__/
 *.pyc
 *.pyo
 db.sqlite3
+*.sqlite3.bak-*
 backend/media/
+backend/staticfiles/
+.env
+production.env
 
 # Node
 frontend/node_modules/

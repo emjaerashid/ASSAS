@@ -1,22 +1,28 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
+import { useFeedback } from '../../context/FeedbackContext';
 import { useAuth } from '../../context/AuthContext';
+import SemesterFields from '../../components/SemesterFields';
+import { semesterIntake } from '../../utils/semester';
 
 export default function AddDrop() {
+  const { toast, confirm } = useFeedback();
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [enrolments, setEnrolments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ subject_code: '', action: 'add', reason: '', semester: '202601' });
+  const [form, setForm] = useState({ subject_code: '', action: 'add', reason: '', semester: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const programmeCode = user?.student_profile?.programme?.programme_code;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const profile = user?.student_profile;
+  const programmeCode = profile?.programme?.programme_code;
 
   const fetchData = () => {
     if (!programmeCode) return;
@@ -37,6 +43,15 @@ export default function AddDrop() {
 
   useEffect(fetchData, [programmeCode]);
 
+  // The registration period a student is actively enrolled in - the most
+  // recent semester code with active (assigned/in_progress) enrolments -
+  // is what add/drop requests should default to and match against.
+  const activeSemesterCode = (() => {
+    const active = enrolments.filter((e) => ['assigned', 'in_progress'].includes(e.status));
+    const pool = active.length ? active : enrolments;
+    return pool.reduce((latest, e) => (e.semester > latest ? e.semester : latest), '');
+  })();
+
   const completedCodes = new Set(
     enrolments.filter((e) => e.status === 'passed').map((e) => e.subject.subject_code)
   );
@@ -45,12 +60,41 @@ export default function AddDrop() {
       .filter((e) => e.semester === form.semester && ['assigned', 'in_progress'].includes(e.status))
       .map((e) => e.subject.subject_code)
   );
+  // Adding: any subject in the programme not already assigned this semester
+  // or already passed. Dropping: only subjects currently assigned this semester.
   const subjectOptions = form.action === 'drop'
     ? subjects.filter((s) => assignedCodesForSemester.has(s.subject_code))
-    : subjects.filter((s) => !assignedCodesForSemester.has(s.subject_code) && !completedCodes.has(s.subject_code));
+    : subjects.filter((s) =>
+        !assignedCodesForSemester.has(s.subject_code) &&
+        !completedCodes.has(s.subject_code)
+      );
+
+  const openNewRequest = () => {
+    setForm({ subject_code: '', action: 'add', reason: '', semester: activeSemesterCode });
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  // "New Add/Drop" shortcuts (topbar, quick rail) link here with ?new=1 so
+  // the form is already open, pre-filled with the active semester.
+  useEffect(() => {
+    if (loading || searchParams.get('new') !== '1') return;
+    openNewRequest();
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, searchParams]);
+
+  const activeCredits = enrolments
+    .filter((e) => e.semester === activeSemesterCode && ['assigned', 'in_progress'].includes(e.status))
+    .reduce((sum, e) => sum + e.subject.credit_hours, 0);
+  const activeSubjectCount = enrolments
+    .filter((e) => e.semester === activeSemesterCode && ['assigned', 'in_progress'].includes(e.status)).length;
+  const creditCap = profile?.effective_credit_cap;
+  const intake = semesterIntake(activeSemesterCode);
+  const pendingCount = requests.filter((r) => r.status === 'pending').length;
 
   const resetForm = () => {
-    setForm({ subject_code: '', action: 'add', reason: '', semester: '202601' });
+    setForm({ subject_code: '', action: 'add', reason: '', semester: activeSemesterCode });
     setEditingId(null);
     setShowForm(false);
   };
@@ -63,14 +107,13 @@ export default function AddDrop() {
     try {
       if (editingId) {
         await api.put(`/student/add-drop/${editingId}/`, form);
-        setSuccess('Request updated successfully!');
+        toast.success('Request updated.');
       } else {
         await api.post('/student/add-drop/', form);
-        setSuccess('Request submitted successfully!');
+        toast.success('Request submitted.');
       }
       resetForm();
       fetchData();
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -90,13 +133,13 @@ export default function AddDrop() {
   };
 
   const handleWithdraw = async (id) => {
-    if (!confirm('Withdraw this request?')) return;
+    if (!(await confirm({ title: 'Withdraw this request?', confirmLabel: 'Withdraw', danger: true }))) return;
     setActionLoading(id);
     try {
       await api.post(`/student/add-drop/${id}/withdraw/`, {});
       fetchData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setActionLoading(null);
     }
@@ -109,12 +152,48 @@ export default function AddDrop() {
           <h1>Add/Drop Request</h1>
           <p>Submit requests to add or drop subjects for admin approval</p>
         </div>
-        <button className="btn btn-primary" onClick={() => (showForm ? resetForm() : setShowForm(true))}>
-          {showForm ? 'Cancel' : '+ New Request'}
+        <button className="btn btn-primary" onClick={() => (showForm ? resetForm() : openNewRequest())}>
+          {showForm ? 'Cancel' : <><span className="material-symbols-outlined">add</span>New Request</>}
         </button>
       </div>
 
-      {success && <div className="alert alert-success">{success}</div>}
+
+      {!loading && (
+        <ol className="rules-panel">
+          {activeSemesterCode && (
+            <li>
+              Your active registration semester is <strong className="mono">{activeSemesterCode}</strong>
+              {intake && <> ({intake.label}, {intake.durationWeeks} weeks)</>}.
+            </li>
+          )}
+          {creditCap != null && (
+            <li>
+              You are registered for <strong>{activeCredits} of {creditCap} credit hours</strong>
+              {profile?.status === 'probation' && ' (probation cap)'}
+              {' '}— up to <strong>{Math.max(0, creditCap - activeCredits)} more</strong> can be added.
+            </li>
+          )}
+          {intake && (
+            <li>
+              This semester allows <strong>
+                {intake.minSubjects === intake.maxSubjects ? intake.maxSubjects : `${intake.minSubjects}–${intake.maxSubjects}`} subjects
+              </strong>; you currently have <strong>{activeSubjectCount}</strong>.
+            </li>
+          )}
+          <li>
+            {pendingCount > 0
+              ? <>You have <strong>{pendingCount} pending request{pendingCount === 1 ? '' : 's'}</strong> awaiting admin review.</>
+              : 'You have no pending requests.'}
+            {' '}Pending requests can be edited or withdrawn until they are reviewed.
+          </li>
+          <li>Subjects you have already passed or are already registered for are hidden from the list automatically.</li>
+        </ol>
+      )}
+
+      <div className="info-note">
+        Note: every add/drop request is reviewed by the faculty administrator. A subject is only added to or
+        removed from your timetable once the request is approved.
+      </div>
 
       {showForm && (
         <div className="card mb-24">
@@ -122,20 +201,25 @@ export default function AddDrop() {
           <div className="card-body">
             <form onSubmit={handleSubmit}>
               {error && <div className="alert alert-error">{error}</div>}
-              <div className="grid-2">
+              <div className={form.action === 'drop' ? 'grid-2' : undefined}>
                 <div className="form-group">
                   <label>Action</label>
                   <select className="form-control" value={form.action}
-                    onChange={(e) => setForm({ ...form, action: e.target.value, subject_code: '' })}>
+                    onChange={(e) => {
+                      const action = e.target.value;
+                      setForm({
+                        ...form, action, subject_code: '',
+                        semester: action === 'add' ? activeSemesterCode : form.semester,
+                      });
+                    }}>
                     <option value="add">Add Subject</option>
                     <option value="drop">Drop Subject</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Semester</label>
-                  <input className="form-control" value={form.semester}
-                    onChange={(e) => setForm({ ...form, semester: e.target.value, subject_code: '' })} required />
-                </div>
+                {form.action === 'drop' && (
+                  <SemesterFields value={form.semester}
+                    onChange={(semester) => setForm({ ...form, semester, subject_code: '' })} />
+                )}
               </div>
               <div className="form-group">
                 <label>Subject</label>
@@ -144,7 +228,7 @@ export default function AddDrop() {
                   <option value="">Select a subject</option>
                   {subjectOptions.map((s) => (
                     <option key={s.subject_code} value={s.subject_code}>
-                      {s.subject_code} - {s.subject_name} ({s.credit_hours} cr)
+                      {s.subject_code} - {s.subject_name}
                     </option>
                   ))}
                 </select>

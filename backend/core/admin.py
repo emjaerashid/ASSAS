@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from core.models import (
     User, Faculty, Programme, Student, Subject, Prerequisite,
-    Enrolment, ExceptionLog, Rule, AddDropRequest, Timetable,
+    Enrolment, ExceptionLog, Rule, AddDropRequest, Timetable, TimeSlot, Venue,
 )
 
 
@@ -34,14 +34,19 @@ class ProgrammeAdmin(admin.ModelAdmin):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ('user', 'programme', 'current_year', 'current_semester', 'status')
-    list_filter = ('programme', 'status', 'current_year')
+    list_display = ('user', 'programme', 'current_semester', 'status')
+    list_filter = ('programme', 'status', 'current_semester')
 
 
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
-    list_display = ('subject_code', 'subject_name', 'credit_hours', 'programme', 'year', 'semester')
-    list_filter = ('programme', 'year', 'semester')
+    list_display = ('subject_code', 'subject_name', 'credit_hours', 'programme_list', 'semester')
+    list_filter = ('programmes', 'semester')
+    filter_horizontal = ('programmes',)
+
+    def programme_list(self, obj):
+        return ', '.join(p.programme_code for p in obj.programmes.all())
+    programme_list.short_description = 'Programmes'
 
 
 @admin.register(Prerequisite)
@@ -74,4 +79,20 @@ class AddDropRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Timetable)
 class TimetableAdmin(admin.ModelAdmin):
-    list_display = ('title', 'programme', 'semester', 'uploaded_at')
+    list_display = ('title', 'programme_list', 'semester', 'uploaded_at')
+    filter_horizontal = ('programmes',)
+
+    def programme_list(self, obj):
+        return ', '.join(p.programme_code for p in obj.programmes.all())
+    programme_list.short_description = 'Programmes'
+
+
+@admin.register(TimeSlot)
+class TimeSlotAdmin(admin.ModelAdmin):
+    list_display = ('timetable', 'subject', 'day_of_week', 'start_time', 'end_time', 'venue')
+    list_filter = ('day_of_week', 'timetable__programmes')
+
+
+@admin.register(Venue)
+class VenueAdmin(admin.ModelAdmin):
+    list_display = ('name', 'capacity')

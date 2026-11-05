@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 db.sqlite3
 backend/media/
+.env
 
 # Node
 frontend/node_modules/

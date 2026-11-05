@@ -734,3 +734,24 @@ class AdminStudentEditPasswordTests(TestCase):
         self.client.put(self.url, {'ic_passport': 'IC901'}, format='multipart')
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('IC901'))
+
+
+class SeedDataCommandTests(TestCase):
+    """Guards against seed_data drifting from the schema again."""
+
+    def test_seeds_valid_data_and_is_idempotent(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        call_command('seed_data', stdout=StringIO())
+        counts = (Subject.objects.count(), Enrolment.objects.count(), Student.objects.count())
+        call_command('seed_data', stdout=StringIO())
+
+        self.assertEqual((Subject.objects.count(), Enrolment.objects.count(), Student.objects.count()), counts)
+        self.assertEqual(counts[2], 5)
+        for enrolment in Enrolment.objects.all():
+            enrolment.full_clean()
+        self.assertTrue(User.objects.get(student_id='ADMIN001').check_password('ADMIN001'))
+        nuru = Student.objects.get(user__student_id='202209020002')
+        self.assertGreater(nuru.total_credits_earned, 0)
+        self.assertGreater(nuru.cgpa, 0)

@@ -71,8 +71,9 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env              # then put a real key in DJANGO_SECRET_KEY (see below)
 python manage.py migrate
-python manage.py createsuperuser  # first admin: asks for a Student ID (e.g. ADMIN001), full name and password
+python manage.py seed_data        # optional: sample faculty, programmes, subjects, admin and students
 python manage.py runserver 8000
 ```
 
@@ -86,16 +87,31 @@ npm install
 npm run dev
 ```
 
+To generate a secret key for `.env`:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"
+```
+
 Open http://localhost:3000. The frontend calls the API at `http://localhost:8000/api`, as set in `frontend/src/utils/api.js`. The backend accepts requests from ports 3000 and 5173 on `localhost` and `127.0.0.1`.
 
 ### Signing in
 
 Users sign in with their **Student ID** and, in the second field, their **IC/Passport number**, which is stored hashed as the password.
 
-- **Administrator:** the Student ID and password you gave `createsuperuser`. Type the password into the IC/Passport field.
-- **Students:** an administrator creates students under **Records → Students**. Each one signs in with their Student ID and IC/Passport number. If an administrator changes a student's IC/Passport number, that student's password is reset to the new number.
+After running `seed_data`:
 
-Faculties, programmes, subjects, venues and timetables are all set up from the admin screens. Assignment needs at least one timetable with time slots for the semester.
+| Role | Student ID | IC / Passport |
+|---|---|---|
+| Administrator | `ADMIN001` | `ADMIN001` |
+| Sample student (semester 1) | `202209020001` | `010515140001` |
+| Sample student (semester 8, with history) | `202209020002` | `020320140002` |
+
+`seed_data` also creates `202209020003` to `202209020005`, whose IC numbers are in `backend/core/management/commands/seed_data.py`. It's safe to run more than once. Without it, run `python manage.py createsuperuser` to create the first administrator, and type its password into the IC/Passport field when signing in.
+
+New students are added under **Records → Students**. If an administrator changes a student's IC/Passport number, that student's password is reset to the new number.
+
+`seed_data` doesn't create timetables. Assignment needs at least one timetable with time slots for the semester, which you add under **Records → Timetables**.
 
 ## Running tests
 
@@ -131,7 +147,14 @@ Each semester's subject limit depends on its intake: January and May are 19-week
 
 ## Notes
 
-- **`seed_data` is out of date.** The `python manage.py seed_data` command fails on the current database schema: it still sets the old `Subject.programme` and `year` fields that later migrations removed. Don't use it until it's updated.
-- **Development settings only.** `backend/assas_backend/settings.py` has `DEBUG = True`, a hard-coded `SECRET_KEY` and `ALLOWED_HOSTS = ['*']`. Change all three before deploying anywhere public.
+- **Settings come from the environment.** `backend/assas_backend/settings.py` reads `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS`, from real environment variables or from `backend/.env`, which is gitignored.
+
+  | Variable | Default | Notes |
+  |---|---|---|
+  | `DJANGO_SECRET_KEY` | none | Required: the server won't start without it. |
+  | `DJANGO_DEBUG` | `False` | Set `True` only for local development. |
+  | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated. |
+
+  For a public deployment, also turn on the HTTPS settings that `python manage.py check --deploy` lists.
 - **Local data stays out of Git.** `db.sqlite3` and uploaded files in `backend/media/` are excluded by `.gitignore`. The committed `db.sqlite3.bak-*` files are database snapshots: they contain student IC/Passport numbers in plain text, so keep this repository private.
-- **Icon font.** Material Symbols is loaded with only the weights the app uses. If you add an icon with a different weight or fill, widen the font range in `frontend/index.html`.
+- **Icon font.** Material Symbols is loaded with only the weights the app uses, to keep the download small. `frontend/src/test/iconFont.test.js` fails if any `font-variation-settings` value in the code falls outside the range requested in `frontend/index.html`, and names the value to add.

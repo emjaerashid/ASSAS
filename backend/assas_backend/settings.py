@@ -1,12 +1,43 @@
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-dtgduqbo@po$iys4%l^1i8wgo(0a#&8-4t8d%mqn4lj0k3w^%7'
 
-DEBUG = True
+def _load_env_file(path):
+    """Read KEY=VALUE lines from backend/.env (gitignored) into the
+    environment, without overriding variables that are already set."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
-ALLOWED_HOSTS = ['*']
+
+_load_env_file(BASE_DIR / '.env')
+
+# Secure by default: debug is off, only local hosts are allowed and there is
+# no fallback key. Local development sets these in backend/.env (see
+# .env.example); a deployment sets them as real environment variables.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').strip().lower() in ('1', 'true', 'yes', 'on')
+
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'DJANGO_SECRET_KEY is not set. Copy backend/.env.example to backend/.env '
+        'and fill it in, or set it in the environment.'
+    )
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',

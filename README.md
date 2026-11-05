@@ -57,8 +57,7 @@ ASSAS/
 │       ├── pages/            # Home, Login, admin/*, student/*
 │       ├── utils/            # API client, semester helpers
 │       └── index.css         # Styles for the whole app
-├── Media/                    # Source images
-└── ASSAS_*.png / .svg / .mmd # ERD and activity diagrams
+└── Media/                    # Source images
 ```
 
 ## Getting started
